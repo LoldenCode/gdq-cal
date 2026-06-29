@@ -239,10 +239,11 @@ input {
 .pane-heading,
 .timeline-header {
   display: flex;
-  align-items: baseline;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 12px;
+  min-height: 48px;
+  margin-bottom: 0;
 }
 
 h2 {
@@ -363,6 +364,9 @@ h2 {
   border: 1px solid rgba(23, 32, 28, 0.14);
   background: #fffaf0;
   border-radius: 8px;
+}
+
+.timeline-empty {
   padding: 16px;
 }
 

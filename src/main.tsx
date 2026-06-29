@@ -182,59 +182,61 @@ function Timeline({
   }
 
   return (
-    <section className="timeline">
+    <>
       <div className="timeline-header">
         <h2>Viewing Calendar</h2>
         <p>Watched runs line up by event time so gaps and overlaps are visible</p>
       </div>
-      <div
-        className="timeline-body"
-        ref={scrollRef}
-        onScroll={onScroll}
-        style={{ "--lane-count": group.people.length } as React.CSSProperties}
-      >
-        <div className="time-axis" aria-hidden="true">
-          <div className="axis-track" style={{ height: `${layout.heightPx}px` }}>
-            {daySeparators.map((separator) => (
-              <span className="axis-day-label" key={separator.timeMs} style={{ top: `${separator.topPx ?? 0}px` }}>{separator.label}</span>
-            ))}
-            {ticks.map((tick) => (
-              <span className="axis-time-label" key={tick.timeMs} style={{ top: `${tick.topPx ?? 0}px` }}>{formatTime(new Date(tick.timeMs).toISOString())}</span>
-            ))}
-          </div>
-        </div>
-        {group.people.map((person) => {
-          const blocks = layout.blocksByPerson[person.name] || [];
-          return (
-            <div className="person-column" key={person.name}>
-              <div className="person-lane" style={{ height: `${layout.heightPx}px` }}>
-                {ticks.map((tick) => <span className="lane-gridline" key={tick.timeMs} style={{ top: `${tick.topPx ?? 0}px` }} />)}
-                {daySeparators.map((separator) => (
-                  <span
-                    className="lane-dayline"
-                    key={separator.timeMs}
-                    style={{ top: `${separator.topPx ?? 0}px` }}
-                    aria-hidden="true"
-                  />
-                ))}
-                {blocks.length ? blocks.map((block) => {
-                  return (
-                    <article
-                      key={block.run.id}
-                      className="watch-block"
-                      style={{ top: `${block.topPx ?? 0}px`, height: `${block.heightPx ?? 44}px` }}
-                    >
-                      <span className="watch-time">{formatShortTime(block.run.startTime)}</span>
-                      <span className="watch-title">{block.run.name}</span>
-                    </article>
-                  );
-                }) : <div className="watch-empty">No runs selected</div>}
-              </div>
+      <section className="timeline">
+        <div
+          className="timeline-body"
+          ref={scrollRef}
+          onScroll={onScroll}
+          style={{ "--lane-count": group.people.length } as React.CSSProperties}
+        >
+          <div className="time-axis" aria-hidden="true">
+            <div className="axis-track" style={{ height: `${layout.heightPx}px` }}>
+              {daySeparators.map((separator) => (
+                <span className="axis-day-label" key={separator.timeMs} style={{ top: `${separator.topPx ?? 0}px` }}>{separator.label}</span>
+              ))}
+              {ticks.map((tick) => (
+                <span className="axis-time-label" key={tick.timeMs} style={{ top: `${tick.topPx ?? 0}px` }}>{formatTime(new Date(tick.timeMs).toISOString())}</span>
+              ))}
             </div>
-          );
-        })}
-      </div>
-    </section>
+          </div>
+          {group.people.map((person) => {
+            const blocks = layout.blocksByPerson[person.name] || [];
+            return (
+              <div className="person-column" key={person.name}>
+                <div className="person-lane" style={{ height: `${layout.heightPx}px` }}>
+                  {ticks.map((tick) => <span className="lane-gridline" key={tick.timeMs} style={{ top: `${tick.topPx ?? 0}px` }} />)}
+                  {daySeparators.map((separator) => (
+                    <span
+                      className="lane-dayline"
+                      key={separator.timeMs}
+                      style={{ top: `${separator.topPx ?? 0}px` }}
+                      aria-hidden="true"
+                    />
+                  ))}
+                  {blocks.length ? blocks.map((block) => {
+                    return (
+                      <article
+                        key={block.run.id}
+                        className="watch-block"
+                        style={{ top: `${block.topPx ?? 0}px`, height: `${block.heightPx ?? 44}px` }}
+                      >
+                        <span className="watch-time">{formatShortTime(block.run.startTime)}</span>
+                        <span className="watch-title">{block.run.name}</span>
+                      </article>
+                    );
+                  }) : <div className="watch-empty">No runs selected</div>}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+    </>
   );
 }
 
