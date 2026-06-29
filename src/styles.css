@@ -289,7 +289,7 @@ h2 {
   display: grid;
   grid-template-columns: 42px 82px minmax(0, 1fr) minmax(130px, 0.45fr);
   gap: 12px;
-  align-items: center;
+  align-items: start;
   min-height: 0;
   border: 1px solid rgba(23, 32, 28, 0.14);
   background: #fffaf0;
@@ -312,6 +312,7 @@ h2 {
   background: #f7f4eb;
   color: #17201c;
   border: 1px solid rgba(23, 32, 28, 0.2);
+  align-self: start;
 }
 
 .select-run.active {
@@ -382,20 +383,11 @@ h2 {
 
 .person-column {
   display: grid;
-  gap: 8px;
   min-width: 168px;
-  grid-template-rows: 38px auto;
 }
 
 .time-axis {
-  display: grid;
-  gap: 8px;
-  grid-template-rows: 38px auto;
   min-width: 74px;
-}
-
-.axis-spacer {
-  min-height: 38px;
 }
 
 .axis-track {
@@ -420,25 +412,6 @@ h2 {
   background: #17201c;
   color: #fffaf0;
   font-size: 0.7rem;
-}
-
-.person-token {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  min-height: 38px;
-  padding: 7px 8px 7px 12px;
-  border-radius: 999px;
-  background: #17201c;
-  color: #fffaf0;
-}
-
-.person-token strong {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .icon-button {
@@ -484,7 +457,7 @@ h2 {
 
 .watch-block {
   position: absolute;
-  z-index: 2;
+  z-index: 3;
   left: 9px;
   right: 0;
   overflow: hidden;

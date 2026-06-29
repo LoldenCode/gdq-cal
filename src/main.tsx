@@ -194,7 +194,6 @@ function Timeline({
         style={{ "--lane-count": group.people.length } as React.CSSProperties}
       >
         <div className="time-axis" aria-hidden="true">
-          <div className="axis-spacer" />
           <div className="axis-track" style={{ height: `${layout.heightPx}px` }}>
             {daySeparators.map((separator) => (
               <span className="axis-day-label" key={separator.timeMs} style={{ top: `${separator.topPx ?? 0}px` }}>{separator.label}</span>
@@ -208,9 +207,6 @@ function Timeline({
           const blocks = layout.blocksByPerson[person.name] || [];
           return (
             <div className="person-column" key={person.name}>
-              <div className="person-token">
-                <strong>{person.name}</strong>
-              </div>
               <div className="person-lane" style={{ height: `${layout.heightPx}px` }}>
                 {ticks.map((tick) => <span className="lane-gridline" key={tick.timeMs} style={{ top: `${tick.topPx ?? 0}px` }} />)}
                 {daySeparators.map((separator) => (
