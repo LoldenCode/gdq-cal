@@ -1,6 +1,6 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
-import { CalendarDays, Check, Clock, Copy, RefreshCw, Sparkles, Users } from "lucide-react";
+import { CalendarDays, Check, Clock, Copy, RefreshCw, Users } from "lucide-react";
 import "./styles.css";
 
 type Run = {
@@ -23,28 +23,17 @@ type ScheduleResponse = {
   runs: Run[];
 };
 
-type RunGroup = {
-  title: string;
-  subtitle: string;
-  runs: Run[];
-};
-
-type Room = {
+type GroupPlan = {
   slug: string;
   people: Array<{ name: string; joinedAt: string }>;
-  picks: Record<string, string[]>;
+  selectionsByPerson: Record<string, string[]>;
 };
 
 function getInitialSlug() {
   const params = new URLSearchParams(window.location.search);
-  const querySlug = params.get("room");
-  if (querySlug) return querySlug;
-  const pathSlug = window.location.pathname.match(/^\/r\/([^/]+)/)?.[1];
-  return pathSlug || "main";
-}
-
-function getStoredName(slug: string) {
-  return localStorage.getItem(`gdq-watch-name:${slug}`) || "";
+  const querySlug = params.get("group") || params.get("room");
+  const pathSlug = window.location.pathname.match(/^\/g\/([^/]+)/)?.[1];
+  return cleanSlug(querySlug || pathSlug || "agdq-watch");
 }
 
 function cleanSlug(value: string) {
@@ -56,10 +45,22 @@ function cleanSlug(value: string) {
     .slice(0, 48);
 }
 
+function getStoredName(slug: string) {
+  return localStorage.getItem(`gdq-plan-name:${slug}`) || "";
+}
+
 function formatTime(value: string | null) {
   if (!value) return "TBD";
   return new Intl.DateTimeFormat(undefined, {
     weekday: "short",
+    hour: "numeric",
+    minute: "2-digit"
+  }).format(new Date(value));
+}
+
+function formatShortTime(value: string | null) {
+  if (!value) return "";
+  return new Intl.DateTimeFormat(undefined, {
     hour: "numeric",
     minute: "2-digit"
   }).format(new Date(value));
@@ -70,80 +71,108 @@ function formatDuration(value: string) {
   return value.replace(/^0 days?,?\s*/i, "").replace(/^0:/, "");
 }
 
-function getGroups(runs: Run[]): RunGroup[] {
-  const now = Date.now();
-  const sorted = [...runs].sort((a, b) => {
-    const aTime = a.startTime ? new Date(a.startTime).getTime() : Number.MAX_SAFE_INTEGER;
-    const bTime = b.startTime ? new Date(b.startTime).getTime() : Number.MAX_SAFE_INTEGER;
-    return aTime - bTime;
-  });
-  const currentIndex = sorted.findIndex((run, index) => {
-    const start = run.startTime ? new Date(run.startTime).getTime() : 0;
-    const next = sorted[index + 1]?.startTime ? new Date(sorted[index + 1].startTime as string).getTime() : Number.MAX_SAFE_INTEGER;
-    return start <= now && now < next;
-  });
-  const upcomingStart = currentIndex >= 0 ? currentIndex : sorted.findIndex((run) => run.startTime && new Date(run.startTime).getTime() >= now);
-  const start = upcomingStart >= 0 ? upcomingStart : 0;
-
-  return [
-    {
-      title: "Now",
-      subtitle: "The run to jump into first",
-      runs: sorted.slice(start, start + 1)
-    },
-    {
-      title: "Up Next",
-      subtitle: "Good moments to rally the group",
-      runs: sorted.slice(start + 1, start + 4)
-    },
-    {
-      title: "Later",
-      subtitle: "The watchlist for the rest of the session",
-      runs: sorted.slice(start + 4, start + 14)
-    }
-  ];
+function estimateEnd(run: Run) {
+  if (run.endTime) return new Date(run.endTime).getTime();
+  if (!run.startTime) return null;
+  const parts = run.estimate.match(/(?:(\d+)\s+days?,?\s*)?(\d+):(\d+):(\d+)/i);
+  if (!parts) return new Date(run.startTime).getTime() + 45 * 60 * 1000;
+  const days = Number(parts[1] || 0);
+  const hours = Number(parts[2] || 0);
+  const minutes = Number(parts[3] || 0);
+  const seconds = Number(parts[4] || 0);
+  return new Date(run.startTime).getTime() + (((days * 24 + hours) * 60 + minutes) * 60 + seconds) * 1000;
 }
 
-function RunCard({
+function getTimelineBounds(runs: Run[]) {
+  const starts = runs.map((run) => (run.startTime ? new Date(run.startTime).getTime() : null)).filter((time): time is number => time !== null);
+  const ends = runs.map(estimateEnd).filter((time): time is number => time !== null);
+  const min = Math.min(...starts);
+  const max = Math.max(...ends);
+  return Number.isFinite(min) && Number.isFinite(max) && max > min ? { min, max } : null;
+}
+
+function selectedNames(group: GroupPlan | null, runId: string) {
+  if (!group) return [];
+  return Object.entries(group.selectionsByPerson)
+    .filter(([, selections]) => selections.includes(runId))
+    .map(([name]) => name);
+}
+
+function ScheduleRow({
   run,
-  featured = false,
-  room,
+  group,
   currentName,
   onToggle
 }: {
   run: Run;
-  featured?: boolean;
-  room: Room | null;
+  group: GroupPlan | null;
   currentName: string;
-  onToggle: (runId: string, watching: boolean) => void;
+  onToggle: (runId: string, selected: boolean) => void;
 }) {
-  const watchers = room?.picks[run.id] || [];
-  const hasJoined = Boolean(currentName && room?.people.some((person) => person.name.toLowerCase() === currentName.toLowerCase()));
-  const isWatching = hasJoined && watchers.some((name) => name.toLowerCase() === currentName.toLowerCase());
+  const joined = Boolean(currentName && group?.people.some((person) => person.name.toLowerCase() === currentName.toLowerCase()));
+  const currentSelections = currentName ? group?.selectionsByPerson[currentName] || [] : [];
+  const selected = joined && currentSelections.includes(run.id);
+  const names = selectedNames(group, run.id);
+
   return (
-    <article className={featured ? "run-card featured" : "run-card"}>
-      <div className="run-time">
-        <Clock size={16} aria-hidden="true" />
-        <span>{formatTime(run.startTime)}</span>
+    <article className={selected ? "schedule-row selected" : "schedule-row"}>
+      <button className={selected ? "select-run active" : "select-run"} type="button" disabled={!joined} onClick={() => onToggle(run.id, !selected)} aria-label={`Select ${run.name}`}>
+        <Check size={16} aria-hidden="true" />
+      </button>
+      <div className="time-cell">
+        <strong>{formatShortTime(run.startTime)}</strong>
+        <span>{formatTime(run.startTime).split(",")[0]}</span>
       </div>
-      <h3>{run.name}</h3>
-      <div className="run-meta">
-        <span>{run.category || "Any%"}</span>
-        <span>{formatDuration(run.estimate)}</span>
-        {run.console ? <span>{run.console}</span> : null}
+      <div className="run-cell">
+        <h3>{run.name}</h3>
+        <p>{run.category || "Any%"} · {formatDuration(run.estimate)}{run.console ? ` · ${run.console}` : ""}</p>
+        <p className="runners">{run.runners.length ? run.runners.join(", ") : "Runner TBD"}</p>
       </div>
-      <div className="runner-line">
-        <Users size={16} aria-hidden="true" />
-        <span>{run.runners.length ? run.runners.join(", ") : "Runner TBD"}</span>
-      </div>
-      <div className="watch-row">
-        <button className={isWatching ? "watch-button active" : "watch-button"} type="button" disabled={!hasJoined} onClick={() => onToggle(run.id, !isWatching)}>
-          <Check size={16} aria-hidden="true" />
-          {isWatching ? "Watching" : "Want to watch"}
-        </button>
-        <span className="watchers">{watchers.length ? watchers.join(", ") : hasJoined ? "No picks yet" : "Join this room first"}</span>
-      </div>
+      <div className="people-cell">{names.length ? names.join(", ") : joined ? "No one yet" : "Join to plan"}</div>
     </article>
+  );
+}
+
+function Timeline({ runs, group }: { runs: Run[]; group: GroupPlan | null }) {
+  const bounds = getTimelineBounds(runs);
+  const runById = new Map(runs.map((run) => [run.id, run]));
+  if (!bounds || !group?.people.length) {
+    return <section className="timeline-empty">Join a group and select runs to build the waterfall chart.</section>;
+  }
+  const duration = bounds.max - bounds.min;
+
+  return (
+    <section className="timeline">
+      <div className="timeline-header">
+        <h2>Viewing Waterfall</h2>
+        <p>{formatTime(new Date(bounds.min).toISOString())} to {formatTime(new Date(bounds.max).toISOString())}</p>
+      </div>
+      <div className="timeline-body">
+        {group.people.map((person) => {
+          const selections = group.selectionsByPerson[person.name] || [];
+          return (
+            <div className="timeline-lane" key={person.name}>
+              <div className="lane-name">{person.name}</div>
+              <div className="lane-track">
+                {selections.map((runId) => {
+                  const run = runById.get(runId);
+                  if (!run?.startTime) return null;
+                  const start = new Date(run.startTime).getTime();
+                  const end = estimateEnd(run) || start + 45 * 60 * 1000;
+                  const left = ((start - bounds.min) / duration) * 100;
+                  const width = Math.max(((end - start) / duration) * 100, 2);
+                  return (
+                    <div className="timeline-block" key={runId} style={{ left: `${left}%`, width: `${width}%` }} title={run.name}>
+                      {run.name}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </section>
   );
 }
 
@@ -152,16 +181,16 @@ function App() {
   const [slugDraft, setSlugDraft] = React.useState(getInitialSlug);
   const [nameDraft, setNameDraft] = React.useState(() => getStoredName(getInitialSlug()));
   const [currentName, setCurrentName] = React.useState(() => getStoredName(getInitialSlug()));
-  const [room, setRoom] = React.useState<Room | null>(null);
+  const [group, setGroup] = React.useState<GroupPlan | null>(null);
   const [schedule, setSchedule] = React.useState<ScheduleResponse | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(true);
-  const shareUrl = `${window.location.origin}/?room=${encodeURIComponent(slug)}`;
+  const shareUrl = `${window.location.origin}/?group=${encodeURIComponent(slug)}`;
 
-  const loadRoom = React.useCallback(async (roomSlug: string) => {
-    const response = await fetch(`/api/rooms/${encodeURIComponent(roomSlug)}`, { headers: { Accept: "application/json" } });
-    if (!response.ok) throw new Error(`Room request failed with ${response.status}`);
-    setRoom(await response.json());
+  const loadGroup = React.useCallback(async (groupSlug: string) => {
+    const response = await fetch(`/api/groups/${encodeURIComponent(groupSlug)}`, { headers: { Accept: "application/json" } });
+    if (!response.ok) throw new Error(`Group request failed with ${response.status}`);
+    setGroup(await response.json());
   }, []);
 
   const load = React.useCallback(async () => {
@@ -171,13 +200,13 @@ function App() {
       const response = await fetch("/api/schedule", { headers: { Accept: "application/json" } });
       if (!response.ok) throw new Error(`Schedule request failed with ${response.status}`);
       setSchedule(await response.json());
-      await loadRoom(slug);
+      await loadGroup(slug);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Schedule request failed");
     } finally {
       setLoading(false);
     }
-  }, [loadRoom, slug]);
+  }, [loadGroup, slug]);
 
   React.useEffect(() => {
     void load();
@@ -191,14 +220,14 @@ function App() {
     setCurrentName(storedName);
   }, [slug]);
 
-  async function joinRoom(event: React.FormEvent) {
+  async function joinGroup(event: React.FormEvent) {
     event.preventDefault();
     const nextSlug = cleanSlug(slugDraft || slug);
     const name = nameDraft.trim();
     if (!nextSlug || !name) return;
     setError(null);
     try {
-      const response = await fetch(`/api/rooms/${encodeURIComponent(nextSlug)}/join`, {
+      const response = await fetch(`/api/groups/${encodeURIComponent(nextSlug)}/join`, {
         method: "POST",
         headers: { "content-type": "application/json", Accept: "application/json" },
         body: JSON.stringify({ name })
@@ -207,45 +236,51 @@ function App() {
         const payload = await response.json().catch(() => null);
         throw new Error(payload?.error || `Join failed with ${response.status}`);
       }
-      localStorage.setItem(`gdq-watch-name:${nextSlug}`, name);
+      localStorage.setItem(`gdq-plan-name:${nextSlug}`, name);
       setCurrentName(name);
       setSlug(nextSlug);
       setSlugDraft(nextSlug);
-      window.history.replaceState(null, "", `/?room=${encodeURIComponent(nextSlug)}`);
-      setRoom(await response.json());
+      window.history.replaceState(null, "", `/?group=${encodeURIComponent(nextSlug)}`);
+      setGroup(await response.json());
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not join room");
+      setError(err instanceof Error ? err.message : "Could not join group");
     }
   }
 
-  async function togglePick(runId: string, watching: boolean) {
+  async function toggleSelection(runId: string, selected: boolean) {
     if (!currentName) return;
     setError(null);
     try {
-      const response = await fetch(`/api/rooms/${encodeURIComponent(slug)}/picks`, {
+      const response = await fetch(`/api/groups/${encodeURIComponent(slug)}/selections`, {
         method: "POST",
         headers: { "content-type": "application/json", Accept: "application/json" },
-        body: JSON.stringify({ name: currentName, runId, watching })
+        body: JSON.stringify({ name: currentName, runId, selected })
       });
       if (!response.ok) {
         const payload = await response.json().catch(() => null);
-        throw new Error(payload?.error || `Pick update failed with ${response.status}`);
+        throw new Error(payload?.error || `Selection update failed with ${response.status}`);
       }
-      setRoom(await response.json());
+      setGroup(await response.json());
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not update pick");
+      setError(err instanceof Error ? err.message : "Could not update schedule");
     }
   }
 
-  const groups = schedule ? getGroups(schedule.runs) : [];
+  const sortedRuns = React.useMemo(() => {
+    return [...(schedule?.runs || [])].sort((a, b) => {
+      const aTime = a.startTime ? new Date(a.startTime).getTime() : Number.MAX_SAFE_INTEGER;
+      const bTime = b.startTime ? new Date(b.startTime).getTime() : Number.MAX_SAFE_INTEGER;
+      return aTime - bTime || a.position - b.position;
+    });
+  }, [schedule]);
 
   return (
     <main>
-      <section className="hero">
+      <header className="hero">
         <div>
-          <p className="eyebrow"><Sparkles size={16} aria-hidden="true" /> GDQ watch board</p>
+          <p className="eyebrow">GDQ watch party planner</p>
           <h1>{schedule?.eventName ?? "Games Done Quick"}</h1>
-          <p className="lede">A shared schedule view for picking the next run, rallying friends, and keeping the stream night moving.</p>
+          <p className="lede">Pick your personal watch schedule, share the group link, and compare everyone&apos;s plan in a timeline before the event starts.</p>
         </div>
         <div className="hero-actions">
           <button type="button" onClick={() => void load()} disabled={loading}>
@@ -257,47 +292,50 @@ function App() {
             {schedule ? `Updated ${formatTime(schedule.updatedAt)}` : "Waiting for schedule"}
           </div>
         </div>
-      </section>
+      </header>
 
-      <section className="room-panel">
-        <form className="join-form" onSubmit={joinRoom}>
+      <section className="group-panel">
+        <form className="join-form" onSubmit={joinGroup}>
           <label>
-            Share slug
-            <input value={slugDraft} onChange={(event) => setSlugDraft(cleanSlug(event.target.value))} placeholder="pizza-night" />
+            Group slug
+            <input value={slugDraft} onChange={(event) => setSlugDraft(cleanSlug(event.target.value))} placeholder="discord-watch-party" />
           </label>
           <label>
             Your name
             <input value={nameDraft} onChange={(event) => setNameDraft(event.target.value)} placeholder="Alden" />
           </label>
-          <button type="submit">Join room</button>
+          <button type="submit">Join plan</button>
           <button type="button" className="secondary" onClick={() => void navigator.clipboard.writeText(shareUrl)}>
             <Copy size={16} aria-hidden="true" />
             Copy link
           </button>
         </form>
-        <div className="room-summary">
+        <div className="group-summary">
           <strong>{slug}</strong>
-          <span>{room?.people.length || 0}/6 people</span>
-          <span>{room?.people.map((person) => person.name).join(", ") || "No one joined yet"}</span>
+          <span><Users size={15} aria-hidden="true" /> {group?.people.length || 0}/6 planners</span>
+          <span>{group?.people.map((person) => person.name).join(", ") || "No one joined yet"}</span>
         </div>
       </section>
 
-      {error ? <section className="notice">Could not load the GDQ schedule: {error}</section> : null}
+      {error ? <section className="notice">Could not update the plan: {error}</section> : null}
       {loading && !schedule ? <section className="notice">Loading the run list...</section> : null}
 
-      {groups.map((group, groupIndex) => (
-        <section className="run-section" key={group.title}>
-          <div className="section-heading">
-            <h2>{group.title}</h2>
-            <p>{group.subtitle}</p>
+      <section className="planner-layout">
+        <section className="schedule-pane">
+          <div className="pane-heading">
+            <h2>Schedule</h2>
+            <p>{currentName ? `Selecting as ${currentName}` : "Join the group to select your runs"}</p>
           </div>
-          <div className={groupIndex === 0 ? "grid single" : "grid"}>
-            {group.runs.map((run, index) => (
-              <RunCard key={run.id} run={run} featured={groupIndex === 0 && index === 0} room={room} currentName={currentName} onToggle={togglePick} />
+          <div className="schedule-list">
+            {sortedRuns.map((run) => (
+              <ScheduleRow key={run.id} run={run} group={group} currentName={currentName} onToggle={toggleSelection} />
             ))}
           </div>
         </section>
-      ))}
+        <aside className="waterfall-pane">
+          <Timeline runs={sortedRuns} group={group} />
+        </aside>
+      </section>
     </main>
   );
 }

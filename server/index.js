@@ -11,7 +11,7 @@ const port = Number(process.env.PORT || 3000);
 const eventId = Number(process.env.GDQ_EVENT_ID || 66);
 const trackerBaseUrl = process.env.GDQ_TRACKER_BASE_URL || "https://tracker.gamesdonequick.com/tracker/api/v2";
 const cacheMs = Number(process.env.SCHEDULE_CACHE_MS || 120000);
-const dataFile = process.env.DATA_FILE || join(__dirname, "..", "data", "watch-tags.json");
+const dataFile = process.env.DATA_FILE || join(__dirname, "..", "data", "watch-plans.json");
 const watchStore = new WatchStore(dataFile);
 
 let cachedSchedule = null;
@@ -112,16 +112,16 @@ const server = createServer(async (req, res) => {
     const url = new URL(req.url || "/", "http://localhost");
     if (url.pathname === "/api/health") return json(res, 200, { ok: true });
     if (url.pathname === "/api/schedule") return json(res, 200, await fetchSchedule());
-    if (url.pathname.startsWith("/api/rooms/")) {
+    if (url.pathname.startsWith("/api/groups/")) {
       const [, , , rawSlug] = url.pathname.split("/");
-      if (req.method === "GET") return json(res, 200, await watchStore.getRoom(rawSlug));
+      if (req.method === "GET") return json(res, 200, await watchStore.getGroup(rawSlug));
       if (req.method === "POST" && url.pathname.endsWith("/join")) {
         const body = await parseJsonBody(req);
-        return json(res, 200, await watchStore.joinRoom(rawSlug, body.name));
+        return json(res, 200, await watchStore.joinGroup(rawSlug, body.name));
       }
-      if (req.method === "POST" && url.pathname.endsWith("/picks")) {
+      if (req.method === "POST" && url.pathname.endsWith("/selections")) {
         const body = await parseJsonBody(req);
-        return json(res, 200, await watchStore.setPick(rawSlug, body.name, body.runId, Boolean(body.watching)));
+        return json(res, 200, await watchStore.setSelection(rawSlug, body.name, body.runId, Boolean(body.selected)));
       }
     }
     if (!existsSync(publicDir)) {

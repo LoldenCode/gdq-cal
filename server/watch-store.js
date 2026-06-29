@@ -10,7 +10,7 @@ function cleanSlug(value) {
     .replace(/[^a-z0-9-]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 48);
-  if (!slug) throw new Error("Room slug is required");
+  if (!slug) throw new Error("Group slug is required");
   return slug;
 }
 
@@ -36,7 +36,7 @@ export class WatchStore {
     try {
       return JSON.parse(await readFile(this.filePath, "utf8"));
     } catch (error) {
-      if (error?.code === "ENOENT") return { rooms: {} };
+      if (error?.code === "ENOENT") return { groups: {} };
       throw error;
     }
   }
@@ -57,49 +57,78 @@ export class WatchStore {
     return operation;
   }
 
-  async getRoom(slugValue) {
-    const slug = cleanSlug(slugValue);
-    const data = await this.readAll();
-    return data.rooms[slug] || { slug, people: [], picks: {} };
+  normalizeData(data) {
+    if (!data.groups && data.rooms) {
+      data.groups = {};
+      for (const [slug, room] of Object.entries(data.rooms)) {
+        const selectionsByPerson = {};
+        for (const [runId, names] of Object.entries(room.picks || {})) {
+          for (const name of names) {
+            selectionsByPerson[name] = selectionsByPerson[name] || [];
+            selectionsByPerson[name].push(runId);
+          }
+        }
+        data.groups[slug] = {
+          slug,
+          people: room.people || [],
+          selectionsByPerson
+        };
+      }
+      delete data.rooms;
+    }
+    data.groups = data.groups || {};
+    return data;
   }
 
-  async joinRoom(slugValue, nameValue) {
+  emptyGroup(slug) {
+    return { slug, people: [], selectionsByPerson: {} };
+  }
+
+  async getGroup(slugValue) {
+    const slug = cleanSlug(slugValue);
+    const data = this.normalizeData(await this.readAll());
+    return data.groups[slug] || this.emptyGroup(slug);
+  }
+
+  async joinGroup(slugValue, nameValue) {
     const slug = cleanSlug(slugValue);
     const name = cleanName(nameValue);
     return this.update((data) => {
-      const room = data.rooms[slug] || { slug, people: [], picks: {} };
-      const exists = room.people.some((person) => person.name.toLowerCase() === name.toLowerCase());
+      this.normalizeData(data);
+      const group = data.groups[slug] || this.emptyGroup(slug);
+      const exists = group.people.some((person) => person.name.toLowerCase() === name.toLowerCase());
       if (!exists) {
-        if (room.people.length >= MAX_PEOPLE) throw new Error("Room already has six people");
-        room.people.push({ name, joinedAt: new Date().toISOString() });
+        if (group.people.length >= MAX_PEOPLE) throw new Error("Group already has six people");
+        group.people.push({ name, joinedAt: new Date().toISOString() });
       }
-      data.rooms[slug] = room;
-      return room;
+      group.selectionsByPerson[name] = group.selectionsByPerson[name] || [];
+      data.groups[slug] = group;
+      return group;
     });
   }
 
-  async setPick(slugValue, nameValue, runIdValue, watching) {
+  async setSelection(slugValue, nameValue, runIdValue, selected) {
     const slug = cleanSlug(slugValue);
     const name = cleanName(nameValue);
     const runId = cleanRunId(runIdValue);
     return this.update((data) => {
-      const room = data.rooms[slug] || { slug, people: [], picks: {} };
-      const exists = room.people.some((person) => person.name.toLowerCase() === name.toLowerCase());
+      this.normalizeData(data);
+      const group = data.groups[slug] || this.emptyGroup(slug);
+      const exists = group.people.some((person) => person.name.toLowerCase() === name.toLowerCase());
       if (!exists) {
-        if (room.people.length >= MAX_PEOPLE) throw new Error("Room already has six people");
-        room.people.push({ name, joinedAt: new Date().toISOString() });
+        if (group.people.length >= MAX_PEOPLE) throw new Error("Group already has six people");
+        group.people.push({ name, joinedAt: new Date().toISOString() });
       }
 
-      const current = new Set(room.picks[runId] || []);
-      if (watching) current.add(name);
-      else current.delete(name);
+      const current = new Set(group.selectionsByPerson[name] || []);
+      if (selected) current.add(runId);
+      else current.delete(runId);
 
       const next = [...current].sort((a, b) => a.localeCompare(b));
-      if (next.length) room.picks[runId] = next;
-      else delete room.picks[runId];
+      group.selectionsByPerson[name] = next;
 
-      data.rooms[slug] = room;
-      return room;
+      data.groups[slug] = group;
+      return group;
     });
   }
 }

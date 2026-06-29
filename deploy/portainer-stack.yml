@@ -4,7 +4,7 @@ services:
     restart: unless-stopped
     environment:
       GDQ_EVENT_ID: "66"
-      DATA_FILE: /data/watch-tags.json
+      DATA_FILE: /data/watch-plans.json
     ports:
       - "18080:3000"
     volumes:
