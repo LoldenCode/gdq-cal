@@ -222,12 +222,15 @@ function Timeline({
                     return (
                       <article
                         key={block.run.id}
-                        className="watch-block"
-                        style={{ top: `${block.topPx ?? 0}px`, height: `${block.heightPx ?? 44}px` }}
-                      >
+                      className="watch-block"
+                      style={{ top: `${block.topPx ?? 0}px`, height: `${block.heightPx ?? 44}px` }}
+                    >
+                      <span className="watch-meta">
                         <span className="watch-time">{formatShortTime(block.run.startTime)}</span>
-                        <span className="watch-title">{block.run.name}</span>
-                      </article>
+                        <span className="watch-person">{person.name}</span>
+                      </span>
+                      <span className="watch-title">{block.run.name}</span>
+                    </article>
                     );
                   }) : <div className="watch-empty">No runs selected</div>}
                 </div>
