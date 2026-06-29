@@ -43,6 +43,10 @@ function getInitialSlug() {
   return pathSlug || "main";
 }
 
+function getStoredName(slug: string) {
+  return localStorage.getItem(`gdq-watch-name:${slug}`) || "";
+}
+
 function cleanSlug(value: string) {
   return value
     .trim()
@@ -114,7 +118,8 @@ function RunCard({
   onToggle: (runId: string, watching: boolean) => void;
 }) {
   const watchers = room?.picks[run.id] || [];
-  const isWatching = currentName ? watchers.some((name) => name.toLowerCase() === currentName.toLowerCase()) : false;
+  const hasJoined = Boolean(currentName && room?.people.some((person) => person.name.toLowerCase() === currentName.toLowerCase()));
+  const isWatching = hasJoined && watchers.some((name) => name.toLowerCase() === currentName.toLowerCase());
   return (
     <article className={featured ? "run-card featured" : "run-card"}>
       <div className="run-time">
@@ -132,11 +137,11 @@ function RunCard({
         <span>{run.runners.length ? run.runners.join(", ") : "Runner TBD"}</span>
       </div>
       <div className="watch-row">
-        <button className={isWatching ? "watch-button active" : "watch-button"} type="button" disabled={!currentName} onClick={() => onToggle(run.id, !isWatching)}>
+        <button className={isWatching ? "watch-button active" : "watch-button"} type="button" disabled={!hasJoined} onClick={() => onToggle(run.id, !isWatching)}>
           <Check size={16} aria-hidden="true" />
           {isWatching ? "Watching" : "Want to watch"}
         </button>
-        <span className="watchers">{watchers.length ? watchers.join(", ") : "No picks yet"}</span>
+        <span className="watchers">{watchers.length ? watchers.join(", ") : hasJoined ? "No picks yet" : "Join this room first"}</span>
       </div>
     </article>
   );
@@ -145,8 +150,8 @@ function RunCard({
 function App() {
   const [slug, setSlug] = React.useState(getInitialSlug);
   const [slugDraft, setSlugDraft] = React.useState(getInitialSlug);
-  const [nameDraft, setNameDraft] = React.useState(() => localStorage.getItem("gdq-watch-name") || "");
-  const [currentName, setCurrentName] = React.useState(() => localStorage.getItem("gdq-watch-name") || "");
+  const [nameDraft, setNameDraft] = React.useState(() => getStoredName(getInitialSlug()));
+  const [currentName, setCurrentName] = React.useState(() => getStoredName(getInitialSlug()));
   const [room, setRoom] = React.useState<Room | null>(null);
   const [schedule, setSchedule] = React.useState<ScheduleResponse | null>(null);
   const [error, setError] = React.useState<string | null>(null);
@@ -180,6 +185,12 @@ function App() {
     return () => window.clearInterval(timer);
   }, [load]);
 
+  React.useEffect(() => {
+    const storedName = getStoredName(slug);
+    setNameDraft(storedName);
+    setCurrentName(storedName);
+  }, [slug]);
+
   async function joinRoom(event: React.FormEvent) {
     event.preventDefault();
     const nextSlug = cleanSlug(slugDraft || slug);
@@ -196,7 +207,7 @@ function App() {
         const payload = await response.json().catch(() => null);
         throw new Error(payload?.error || `Join failed with ${response.status}`);
       }
-      localStorage.setItem("gdq-watch-name", name);
+      localStorage.setItem(`gdq-watch-name:${nextSlug}`, name);
       setCurrentName(name);
       setSlug(nextSlug);
       setSlugDraft(nextSlug);
