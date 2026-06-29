@@ -27,6 +27,11 @@ function cleanRunId(value) {
   return runId;
 }
 
+function cleanRunIds(value) {
+  if (!Array.isArray(value)) return [];
+  return [...new Set(value.map((entry) => String(entry || "").trim()).filter(Boolean))].slice(0, 500);
+}
+
 function cleanPassword(value) {
   return String(value || "").trim().slice(0, 128);
 }
@@ -126,10 +131,11 @@ export class WatchStore {
     return Object.values(data.groups).map(sanitizeGroup).sort((a, b) => a.slug.localeCompare(b.slug));
   }
 
-  async joinGroup(slugValue, nameValue, passwordValue = "") {
+  async joinGroup(slugValue, nameValue, passwordValue = "", syncedRunIdsValue = []) {
     const slug = cleanSlug(slugValue);
     const name = cleanName(nameValue);
     const password = cleanPassword(passwordValue);
+    const syncedRunIds = cleanRunIds(syncedRunIdsValue);
     return this.update((data) => {
       this.normalizeData(data);
       const group = data.groups[slug] || this.emptyGroup(slug);
@@ -143,7 +149,7 @@ export class WatchStore {
       } else if (password) {
         person.passwordHash = hashPassword(password);
       }
-      group.selectionsByPerson[name] = group.selectionsByPerson[name] || [];
+      group.selectionsByPerson[name] = syncedRunIds.length ? syncedRunIds.sort((a, b) => a.localeCompare(b)) : group.selectionsByPerson[name] || [];
       data.groups[slug] = group;
       return sanitizeGroup(group);
     });

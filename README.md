@@ -39,11 +39,12 @@ traefik.http.routers.gdq-watch-party.rule=Host(`gdq.example.com`)
 ## Sharing With Friends
 
 1. Open a shared group link or pick a readable group slug, such as `my-server-agdq`.
-2. Enter your display name and join the group.
+2. Enter your display name and sync into the group.
 3. Optionally enter a password if you want to protect that name from casual edits.
 4. Select the runs your group plans to watch.
 5. Copy the canonical `/group/my-server-agdq` group link and share it in Discord.
-6. Friends open the same link, join with their own names, and select their schedules.
+6. Friends open the same link, sync with their own names, and select their schedules.
+7. To join another group, enter its slug or open its `/group/...` link and sync; your current selected runs carry over.
 
 The link is long-lived as long as the mounted data volume is preserved.
 

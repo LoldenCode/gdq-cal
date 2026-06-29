@@ -447,13 +447,14 @@ function App() {
     const nextSlug = cleanSlug(slugDraft || slug);
     const name = nameDraft.trim();
     const password = passwordDraft.trim();
+    const selectionsToSync = currentName ? group?.selectionsByPerson[currentName] || [] : [];
     if (!nextSlug || !name) return;
     setError(null);
     try {
       const response = await fetch(`/api/groups/${encodeURIComponent(nextSlug)}/join`, {
         method: "POST",
         headers: { "content-type": "application/json", Accept: "application/json" },
-        body: JSON.stringify({ name, password })
+        body: JSON.stringify({ name, password, selections: selectionsToSync })
       });
       if (!response.ok) {
         const payload = await response.json().catch(() => null);
@@ -577,7 +578,7 @@ function App() {
             Password (optional)
             <input type="password" value={passwordDraft} onChange={(event) => setPasswordDraft(event.target.value)} placeholder="Blank by default" />
           </label>
-          <button type="submit">{slug && slug === cleanSlug(slugDraft) ? "Join group" : "Switch / join"}</button>
+          <button type="submit">{slug && slug === cleanSlug(slugDraft) ? "Sync group" : "Switch / sync"}</button>
           <button type="button" className="secondary" disabled={!shareUrl} onClick={() => void navigator.clipboard.writeText(shareUrl)}>
             <Copy size={16} aria-hidden="true" />
             Copy group link

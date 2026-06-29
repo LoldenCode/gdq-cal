@@ -82,3 +82,20 @@ test("people can optionally protect their selections with a password", async () 
     await rm(dir, { recursive: true, force: true });
   }
 });
+
+test("joining another group can sync the user's selected runs", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "gdq-watch-"));
+  try {
+    const store = new WatchStore(join(dir, "groups.json"));
+
+    await store.joinGroup("source", "Alden");
+    await store.setSelection("source", "Alden", "run-1", true);
+    await store.setSelection("source", "Alden", "run-2", true);
+
+    const synced = await store.joinGroup("destination", "Alden", "", ["run-1", "run-2"]);
+
+    assert.deepEqual(synced.selectionsByPerson.Alden, ["run-1", "run-2"]);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});

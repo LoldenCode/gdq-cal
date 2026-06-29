@@ -147,7 +147,7 @@ const server = createServer(async (req, res) => {
       if (req.method === "GET") return json(res, 200, await watchStore.getGroup(rawSlug));
       if (req.method === "POST" && url.pathname.endsWith("/join")) {
         const body = await parseJsonBody(req);
-        return json(res, 200, await watchStore.joinGroup(rawSlug, body.name, body.password));
+        return json(res, 200, await watchStore.joinGroup(rawSlug, body.name, body.password, body.selections));
       }
       if (req.method === "POST" && url.pathname.endsWith("/selections")) {
         const body = await parseJsonBody(req);
