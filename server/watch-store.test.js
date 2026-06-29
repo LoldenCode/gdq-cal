@@ -38,3 +38,21 @@ test("groups keep durable per-person schedules by slug and support removing part
     await rm(dir, { recursive: true, force: true });
   }
 });
+
+test("admin inventory lists every group with members and selections", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "gdq-watch-"));
+  try {
+    const store = new WatchStore(join(dir, "groups.json"));
+    await store.setSelection("pizza-night", "Alden", "run-1", true);
+    await store.setSelection("pizza-night", "Bea", "run-2", true);
+    await store.joinGroup("late-crew", "Cam");
+
+    const groups = await store.listGroups();
+
+    assert.deepEqual(groups.map((group) => group.slug), ["late-crew", "pizza-night"]);
+    assert.deepEqual(groups.find((group) => group.slug === "pizza-night").people.map((person) => person.name), ["Alden", "Bea"]);
+    assert.deepEqual(groups.find((group) => group.slug === "pizza-night").selectionsByPerson.Alden, ["run-1"]);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});

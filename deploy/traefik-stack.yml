@@ -5,6 +5,7 @@ services:
     environment:
       GDQ_EVENT_ID: "66"
       DATA_FILE: /data/watch-plans.json
+      ADMIN_KEY: change-me
     volumes:
       - gdq_watch_party_data:/data
     networks:

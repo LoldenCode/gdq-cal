@@ -54,6 +54,7 @@ The link is long-lived as long as the mounted data volume is preserved.
 | `GDQ_TRACKER_BASE_URL` | `https://tracker.gamesdonequick.com/tracker/api/v2` | Tracker API base URL |
 | `SCHEDULE_CACHE_MS` | `120000` | Schedule cache duration |
 | `DATA_FILE` | `data/watch-plans.json` | JSON file for shared watch-party plans |
+| `ADMIN_KEY` | unset | Enables `/admin/` and protects admin APIs with this password |
 
 ## Data Persistence
 
@@ -62,11 +63,16 @@ Mount a volume at `/data` and set:
 ```yaml
 environment:
   DATA_FILE: /data/watch-plans.json
+  ADMIN_KEY: change-me
 volumes:
   - gdq_watch_party_data:/data
 ```
 
 Do not delete this volume if you want group links to keep working weeks later.
+
+## Admin
+
+Set `ADMIN_KEY`, then open `/admin/` and enter that value to list every group, review members, and remove people. Public planner pages do not expose member removal.
 
 ## Local Development
 

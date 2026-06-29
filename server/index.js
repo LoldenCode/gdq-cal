@@ -12,6 +12,7 @@ const eventId = Number(process.env.GDQ_EVENT_ID || 66);
 const trackerBaseUrl = process.env.GDQ_TRACKER_BASE_URL || "https://tracker.gamesdonequick.com/tracker/api/v2";
 const cacheMs = Number(process.env.SCHEDULE_CACHE_MS || 120000);
 const dataFile = process.env.DATA_FILE || join(__dirname, "..", "data", "watch-plans.json");
+const adminKey = process.env.ADMIN_KEY || "";
 const watchStore = new WatchStore(dataFile);
 
 let cachedSchedule = null;
@@ -41,6 +42,23 @@ function unwrapResults(payload) {
   if (Array.isArray(payload)) return payload;
   if (Array.isArray(payload?.results)) return payload.results;
   return [];
+}
+
+function isAdminAuthorized(req) {
+  if (!adminKey) return false;
+  return req.headers.authorization === `Bearer ${adminKey}`;
+}
+
+function requireAdmin(req, res) {
+  if (!adminKey) {
+    json(res, 404, { error: "Admin access is not configured" });
+    return false;
+  }
+  if (!isAdminAuthorized(req)) {
+    json(res, 401, { error: "Admin password required" });
+    return false;
+  }
+  return true;
 }
 
 function normalizeRunner(value) {
@@ -112,6 +130,18 @@ const server = createServer(async (req, res) => {
     const url = new URL(req.url || "/", "http://localhost");
     if (url.pathname === "/api/health") return json(res, 200, { ok: true });
     if (url.pathname === "/api/schedule") return json(res, 200, await fetchSchedule());
+    if (url.pathname === "/api/admin/groups") {
+      if (!requireAdmin(req, res)) return;
+      if (req.method === "GET") return json(res, 200, { groups: await watchStore.listGroups() });
+    }
+    if (url.pathname.startsWith("/api/admin/groups/")) {
+      if (!requireAdmin(req, res)) return;
+      const [, , , , rawSlug] = url.pathname.split("/");
+      if (req.method === "DELETE" && url.pathname.endsWith("/people")) {
+        const body = await parseJsonBody(req);
+        return json(res, 200, await watchStore.removePerson(rawSlug, body.name));
+      }
+    }
     if (url.pathname.startsWith("/api/groups/")) {
       const [, , , rawSlug] = url.pathname.split("/");
       if (req.method === "GET") return json(res, 200, await watchStore.getGroup(rawSlug));
@@ -123,11 +153,8 @@ const server = createServer(async (req, res) => {
         const body = await parseJsonBody(req);
         return json(res, 200, await watchStore.setSelection(rawSlug, body.name, body.runId, Boolean(body.selected)));
       }
-      if (req.method === "DELETE" && url.pathname.endsWith("/people")) {
-        const body = await parseJsonBody(req);
-        return json(res, 200, await watchStore.removePerson(rawSlug, body.name));
-      }
     }
+    if (url.pathname.startsWith("/api/")) return json(res, 404, { error: "API route not found" });
     if (!existsSync(publicDir)) {
       const message = await readFile(join(__dirname, "missing-build.html"), "utf8").catch(() => "Build output is missing.");
       res.writeHead(503, { "content-type": "text/html; charset=utf-8" });

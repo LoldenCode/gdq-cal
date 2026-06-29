@@ -83,6 +83,30 @@ button.secondary {
   border: 1px solid rgba(23, 32, 28, 0.2);
 }
 
+button.danger {
+  background: #7f1d1d;
+  color: #fffaf0;
+}
+
+.button-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  padding: 0 16px;
+  border-radius: 8px;
+  background: #17201c;
+  color: #fffaf0;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.button-link.secondary {
+  background: #fffaf0;
+  color: #17201c;
+  border: 1px solid rgba(23, 32, 28, 0.2);
+}
+
 .updated,
 .group-summary span {
   display: inline-flex;
@@ -144,6 +168,59 @@ input {
   border-radius: 8px;
   background: #fffaf0;
   border: 1px solid rgba(23, 32, 28, 0.14);
+}
+
+.admin-login {
+  display: grid;
+  grid-template-columns: minmax(220px, 420px) auto;
+  gap: 10px;
+  align-items: end;
+  padding: 18px 0;
+  border-bottom: 1px solid rgba(23, 32, 28, 0.16);
+}
+
+.admin-groups {
+  display: grid;
+  gap: 14px;
+  padding-top: 20px;
+}
+
+.admin-group {
+  border: 1px solid rgba(23, 32, 28, 0.14);
+  background: #fffaf0;
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.admin-group-header,
+.admin-member {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.admin-group-header {
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(23, 32, 28, 0.12);
+}
+
+.admin-group-header p,
+.admin-member span,
+.empty-copy {
+  margin: 4px 0 0;
+  color: #52615b;
+}
+
+.admin-members {
+  display: grid;
+  gap: 8px;
+  padding-top: 12px;
+}
+
+.admin-member {
+  min-height: 58px;
+  padding: 10px 0;
 }
 
 .planner-layout {

@@ -5,6 +5,7 @@ services:
     environment:
       GDQ_EVENT_ID: "66"
       DATA_FILE: /data/watch-plans.json
+      ADMIN_KEY: change-me
     ports:
       - "3000:3000"
     volumes:

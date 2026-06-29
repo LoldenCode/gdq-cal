@@ -90,6 +90,11 @@ export class WatchStore {
     return data.groups[slug] || this.emptyGroup(slug);
   }
 
+  async listGroups() {
+    const data = this.normalizeData(await this.readAll());
+    return Object.values(data.groups).sort((a, b) => a.slug.localeCompare(b.slug));
+  }
+
   async joinGroup(slugValue, nameValue) {
     const slug = cleanSlug(slugValue);
     const name = cleanName(nameValue);

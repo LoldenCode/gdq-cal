@@ -30,6 +30,10 @@ type GroupPlan = {
   selectionsByPerson: Record<string, string[]>;
 };
 
+type AdminGroupsResponse = {
+  groups: GroupPlan[];
+};
+
 function getInitialSlug() {
   const params = new URLSearchParams(window.location.search);
   const querySlug = params.get("group") || params.get("room");
@@ -114,7 +118,7 @@ function ScheduleRow({
   );
 }
 
-function Timeline({ runs, group, onRemove }: { runs: Run[]; group: GroupPlan | null; onRemove: (name: string) => void }) {
+function Timeline({ runs, group }: { runs: Run[]; group: GroupPlan | null }) {
   if (!group?.people.length) {
     return <section className="timeline-empty">Join a group and select runs to build the shared viewing calendar.</section>;
   }
@@ -146,9 +150,6 @@ function Timeline({ runs, group, onRemove }: { runs: Run[]; group: GroupPlan | n
             <div className="person-column" key={person.name}>
               <div className="person-token">
                 <strong>{person.name}</strong>
-                <button type="button" className="icon-button" onClick={() => onRemove(person.name)} aria-label={`Remove ${person.name}`}>
-                  <Trash2 size={15} aria-hidden="true" />
-                </button>
               </div>
               <div className="person-lane">
                 {ticks.map((tick) => <span className="lane-gridline" key={tick.timeMs} style={{ top: `${tick.percent}%` }} />)}
@@ -178,6 +179,119 @@ function Timeline({ runs, group, onRemove }: { runs: Run[]; group: GroupPlan | n
         })}
       </div>
     </section>
+  );
+}
+
+function AdminApp() {
+  const [adminKey, setAdminKey] = React.useState(() => localStorage.getItem("gdq-admin-key") || "");
+  const [groups, setGroups] = React.useState<GroupPlan[]>([]);
+  const [error, setError] = React.useState<string | null>(null);
+  const [loading, setLoading] = React.useState(false);
+
+  async function loadAdminGroups(key = adminKey) {
+    if (!key.trim()) {
+      setError("Admin password is required");
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await fetch("/api/admin/groups", {
+        headers: { Accept: "application/json", Authorization: `Bearer ${key}` }
+      });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        throw new Error(payload?.error || `Admin request failed with ${response.status}`);
+      }
+      localStorage.setItem("gdq-admin-key", key);
+      const payload = (await response.json()) as AdminGroupsResponse;
+      setGroups(payload.groups);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not load admin view");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function removeAdminPerson(slug: string, name: string) {
+    setError(null);
+    try {
+      const response = await fetch(`/api/admin/groups/${encodeURIComponent(slug)}/people`, {
+        method: "DELETE",
+        headers: {
+          "content-type": "application/json",
+          Accept: "application/json",
+          Authorization: `Bearer ${adminKey}`
+        },
+        body: JSON.stringify({ name })
+      });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        throw new Error(payload?.error || `Remove failed with ${response.status}`);
+      }
+      await loadAdminGroups();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not remove person");
+    }
+  }
+
+  return (
+    <main>
+      <header className="hero">
+        <div>
+          <p className="eyebrow">GDQ watch party admin</p>
+          <h1>Admin</h1>
+          <p className="lede">Review all shared groups and manage members with the server-side admin password.</p>
+        </div>
+        <div className="hero-actions">
+          <a className="button-link secondary" href="/">Planner</a>
+        </div>
+      </header>
+
+      <section className="admin-login">
+        <label>
+          Admin password
+          <input type="password" value={adminKey} onChange={(event) => setAdminKey(event.target.value)} placeholder="ADMIN_KEY" />
+        </label>
+        <button type="button" onClick={() => void loadAdminGroups()} disabled={loading}>
+          <RefreshCw size={17} aria-hidden="true" />
+          {loading ? "Loading" : "Load groups"}
+        </button>
+      </section>
+
+      {error ? <section className="notice">Admin error: {error}</section> : null}
+
+      <section className="admin-groups">
+        {groups.map((group) => (
+          <article className="admin-group" key={group.slug}>
+            <div className="admin-group-header">
+              <div>
+                <h2>{group.slug}</h2>
+                <p>{group.people.length} planner{group.people.length === 1 ? "" : "s"}</p>
+              </div>
+              <a className="button-link secondary" href={`/?group=${encodeURIComponent(group.slug)}`}>Open</a>
+            </div>
+            <div className="admin-members">
+              {group.people.length ? group.people.map((person) => {
+                const selectionCount = group.selectionsByPerson[person.name]?.length || 0;
+                return (
+                  <div className="admin-member" key={person.name}>
+                    <div>
+                      <strong>{person.name}</strong>
+                      <span>{selectionCount} selected run{selectionCount === 1 ? "" : "s"}</span>
+                    </div>
+                    <button type="button" className="danger" onClick={() => void removeAdminPerson(group.slug, person.name)}>
+                      <Trash2 size={15} aria-hidden="true" />
+                      Remove
+                    </button>
+                  </div>
+                );
+              }) : <p className="empty-copy">No members yet</p>}
+            </div>
+          </article>
+        ))}
+      </section>
+    </main>
   );
 }
 
@@ -271,29 +385,6 @@ function App() {
     }
   }
 
-  async function removePerson(name: string) {
-    setError(null);
-    try {
-      const response = await fetch(`/api/groups/${encodeURIComponent(slug)}/people`, {
-        method: "DELETE",
-        headers: { "content-type": "application/json", Accept: "application/json" },
-        body: JSON.stringify({ name })
-      });
-      if (!response.ok) {
-        const payload = await response.json().catch(() => null);
-        throw new Error(payload?.error || `Remove failed with ${response.status}`);
-      }
-      if (name.toLowerCase() === currentName.toLowerCase()) {
-        localStorage.removeItem(`gdq-plan-name:${slug}`);
-        setCurrentName("");
-        setNameDraft("");
-      }
-      setGroup(await response.json());
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not remove person");
-    }
-  }
-
   const sortedRuns = React.useMemo(() => {
     return [...(schedule?.runs || [])].sort((a, b) => {
       const aTime = a.startTime ? new Date(a.startTime).getTime() : Number.MAX_SAFE_INTEGER;
@@ -361,11 +452,11 @@ function App() {
           </div>
         </section>
         <aside className="waterfall-pane">
-          <Timeline runs={sortedRuns} group={group} onRemove={removePerson} />
+          <Timeline runs={sortedRuns} group={group} />
         </aside>
       </section>
     </main>
   );
 }
 
-createRoot(document.getElementById("root")!).render(<App />);
+createRoot(document.getElementById("root")!).render(window.location.pathname.startsWith("/admin") ? <AdminApp /> : <App />);
