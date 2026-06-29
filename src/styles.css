@@ -162,6 +162,13 @@ input {
   font-size: 1.1rem;
 }
 
+.share-url {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .notice {
   margin: 18px 0;
   padding: 14px 16px;

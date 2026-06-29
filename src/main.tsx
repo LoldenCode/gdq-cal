@@ -35,12 +35,14 @@ type AdminGroupsResponse = {
 };
 
 const CALENDAR_TOP_GUTTER_PX = 14;
+const LAST_GROUP_KEY = "gdq-plan-last-slug";
 
 function getInitialSlug() {
   const params = new URLSearchParams(window.location.search);
   const querySlug = params.get("group") || params.get("room");
-  const pathSlug = window.location.pathname.match(/^\/g\/([^/]+)/)?.[1];
-  return cleanSlug(querySlug || pathSlug || "agdq-watch");
+  const pathSlug = window.location.pathname.match(/^\/(?:group|g)\/([^/]+)/)?.[1];
+  const cachedSlug = localStorage.getItem(LAST_GROUP_KEY);
+  return cleanSlug(querySlug || pathSlug || cachedSlug || "");
 }
 
 function cleanSlug(value: string) {
@@ -53,6 +55,7 @@ function cleanSlug(value: string) {
 }
 
 function getStoredName(slug: string) {
+  if (!slug) return "";
   return localStorage.getItem(`gdq-plan-name:${slug}`) || "";
 }
 
@@ -332,7 +335,7 @@ function AdminApp() {
                 <h2>{group.slug}</h2>
                 <p>{group.people.length} planner{group.people.length === 1 ? "" : "s"}</p>
               </div>
-              <a className="button-link secondary" href={`/?group=${encodeURIComponent(group.slug)}`}>Open</a>
+              <a className="button-link secondary" href={`/group/${encodeURIComponent(group.slug)}`}>Open</a>
             </div>
             <div className="admin-members">
               {group.people.length ? group.people.map((person) => {
@@ -370,7 +373,7 @@ function App() {
   const scheduleScrollRef = React.useRef<HTMLDivElement | null>(null);
   const timelineScrollRef = React.useRef<HTMLDivElement | null>(null);
   const syncingScrollRef = React.useRef(false);
-  const shareUrl = `${window.location.origin}/?group=${encodeURIComponent(slug)}`;
+  const shareUrl = slug ? `${window.location.origin}/group/${encodeURIComponent(slug)}` : "";
 
   const loadGroup = React.useCallback(async (groupSlug: string) => {
     const response = await fetch(`/api/groups/${encodeURIComponent(groupSlug)}`, { headers: { Accept: "application/json" } });
@@ -385,7 +388,8 @@ function App() {
       const response = await fetch("/api/schedule", { headers: { Accept: "application/json" } });
       if (!response.ok) throw new Error(`Schedule request failed with ${response.status}`);
       setSchedule(await response.json());
-      await loadGroup(slug);
+      if (slug) await loadGroup(slug);
+      else setGroup(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Schedule request failed");
     } finally {
@@ -422,10 +426,11 @@ function App() {
         throw new Error(payload?.error || `Join failed with ${response.status}`);
       }
       localStorage.setItem(`gdq-plan-name:${nextSlug}`, name);
+      localStorage.setItem(LAST_GROUP_KEY, nextSlug);
       setCurrentName(name);
       setSlug(nextSlug);
       setSlugDraft(nextSlug);
-      window.history.replaceState(null, "", `/?group=${encodeURIComponent(nextSlug)}`);
+      window.history.replaceState(null, "", `/group/${encodeURIComponent(nextSlug)}`);
       setGroup(await response.json());
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not join group");
@@ -433,7 +438,7 @@ function App() {
   }
 
   async function toggleSelection(runId: string, selected: boolean) {
-    if (!currentName) return;
+    if (!currentName || !slug) return;
     setError(null);
     try {
       const response = await fetch(`/api/groups/${encodeURIComponent(slug)}/selections`, {
@@ -523,15 +528,16 @@ function App() {
             <input value={nameDraft} onChange={(event) => setNameDraft(event.target.value)} placeholder="Alden" />
           </label>
           <button type="submit">Join plan</button>
-          <button type="button" className="secondary" onClick={() => void navigator.clipboard.writeText(shareUrl)}>
+          <button type="button" className="secondary" disabled={!shareUrl} onClick={() => void navigator.clipboard.writeText(shareUrl)}>
             <Copy size={16} aria-hidden="true" />
-            Copy link
+            Copy group link
           </button>
         </form>
         <div className="group-summary">
-          <strong>{slug}</strong>
+          <strong>{slug || "No group selected"}</strong>
+          {slug ? <span className="share-url">{shareUrl}</span> : <span>Open a shared `/group/name` link or enter a group slug to join.</span>}
           <span><Users size={15} aria-hidden="true" /> {group?.people.length || 0}/24 planners</span>
-          <span>{group?.people.map((person) => person.name).join(", ") || "No one joined yet"}</span>
+          <span>{group?.people.map((person) => person.name).join(", ") || (slug ? "No one joined yet" : "Join a group to start planning")}</span>
         </div>
       </section>
 

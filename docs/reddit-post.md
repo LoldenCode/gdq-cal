@@ -30,5 +30,5 @@ Example:
 docker compose -f deploy/docker-compose.yml up -d
 
 If you host it for a Discord server, share a link like:
-https://your-domain.example/?group=your-server-watch-party
+https://your-domain.example/group/your-server-watch-party
 ```

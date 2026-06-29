@@ -6,7 +6,7 @@ Create a long-lived group slug, share the link, let friends choose the runs they
 
 ## What It Does
 
-- Durable group links like `https://gdq.example.com/?group=discord-watch-party`
+- Durable group links like `https://gdq.example.com/group/discord-watch-party`
 - Up to 24 planners per group
 - Each person owns their own selected watch schedule
 - Full GDQ schedule as selectable rows
@@ -24,7 +24,7 @@ docker compose -f deploy/docker-compose.yml up -d
 Open:
 
 ```text
-http://localhost:3000/?group=my-discord-watch-party
+http://localhost:3000/group/my-discord-watch-party
 ```
 
 For Portainer, use `deploy/portainer-stack.yml`.
@@ -37,10 +37,10 @@ traefik.http.routers.gdq-watch-party.rule=Host(`gdq.example.com`)
 
 ## Sharing With Friends
 
-1. Pick a readable group slug, such as `my-server-agdq`.
+1. Open a shared group link or pick a readable group slug, such as `my-server-agdq`.
 2. Enter your display name and join the plan.
 3. Select the runs you plan to watch.
-4. Copy the group link and share it in Discord.
+4. Copy the canonical `/group/my-server-agdq` group link and share it in Discord.
 5. Friends open the same link, join with their own names, and select their schedules.
 
 The link is long-lived as long as the mounted data volume is preserved.
