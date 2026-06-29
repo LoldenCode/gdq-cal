@@ -26,7 +26,7 @@ type ScheduleResponse = {
 
 type GroupPlan = {
   slug: string;
-  people: Array<{ name: string; joinedAt: string }>;
+  people: Array<{ name: string; joinedAt: string; passwordProtected?: boolean }>;
   selectionsByPerson: Record<string, string[]>;
 };
 
@@ -58,6 +58,15 @@ function cleanSlug(value: string) {
 function getStoredName(slug: string) {
   if (!slug) return "";
   return localStorage.getItem(`gdq-plan-name:${slug}`) || "";
+}
+
+function passwordKey(slug: string, name: string) {
+  return `gdq-group-password:${slug}:${name.toLowerCase()}`;
+}
+
+function getStoredPassword(slug: string, name: string) {
+  if (!slug || !name) return "";
+  return localStorage.getItem(passwordKey(slug, name)) || "";
 }
 
 function getJoinedSlugs() {
@@ -383,6 +392,7 @@ function App() {
   const [slugDraft, setSlugDraft] = React.useState(getInitialSlug);
   const [nameDraft, setNameDraft] = React.useState(() => getStoredName(getInitialSlug()));
   const [currentName, setCurrentName] = React.useState(() => getStoredName(getInitialSlug()));
+  const [passwordDraft, setPasswordDraft] = React.useState(() => getStoredPassword(getInitialSlug(), getStoredName(getInitialSlug())));
   const [joinedSlugs, setJoinedSlugs] = React.useState(getJoinedSlugs);
   const [group, setGroup] = React.useState<GroupPlan | null>(null);
   const [schedule, setSchedule] = React.useState<ScheduleResponse | null>(null);
@@ -425,25 +435,32 @@ function App() {
     const storedName = getStoredName(slug);
     setNameDraft(storedName);
     setCurrentName(storedName);
+    setPasswordDraft(getStoredPassword(slug, storedName));
   }, [slug]);
+
+  React.useEffect(() => {
+    setPasswordDraft(getStoredPassword(slug, nameDraft.trim()));
+  }, [nameDraft, slug]);
 
   async function joinGroup(event: React.FormEvent) {
     event.preventDefault();
     const nextSlug = cleanSlug(slugDraft || slug);
     const name = nameDraft.trim();
+    const password = passwordDraft.trim();
     if (!nextSlug || !name) return;
     setError(null);
     try {
       const response = await fetch(`/api/groups/${encodeURIComponent(nextSlug)}/join`, {
         method: "POST",
         headers: { "content-type": "application/json", Accept: "application/json" },
-        body: JSON.stringify({ name })
+        body: JSON.stringify({ name, password })
       });
       if (!response.ok) {
         const payload = await response.json().catch(() => null);
         throw new Error(payload?.error || `Join failed with ${response.status}`);
       }
       localStorage.setItem(`gdq-plan-name:${nextSlug}`, name);
+      if (password) localStorage.setItem(passwordKey(nextSlug, name), password);
       localStorage.setItem(LAST_GROUP_KEY, nextSlug);
       rememberJoinedSlug(nextSlug);
       setJoinedSlugs(getJoinedSlugs());
@@ -473,7 +490,7 @@ function App() {
       const response = await fetch(`/api/groups/${encodeURIComponent(slug)}/selections`, {
         method: "POST",
         headers: { "content-type": "application/json", Accept: "application/json" },
-        body: JSON.stringify({ name: currentName, runId, selected })
+        body: JSON.stringify({ name: currentName, runId, selected, password: passwordDraft.trim() })
       });
       if (!response.ok) {
         const payload = await response.json().catch(() => null);
@@ -555,6 +572,10 @@ function App() {
           <label>
             Your name
             <input value={nameDraft} onChange={(event) => setNameDraft(event.target.value)} placeholder="Alden" />
+          </label>
+          <label>
+            Password (optional)
+            <input type="password" value={passwordDraft} onChange={(event) => setPasswordDraft(event.target.value)} placeholder="Blank by default" />
           </label>
           <button type="submit">{slug && slug === cleanSlug(slugDraft) ? "Join group" : "Switch / join"}</button>
           <button type="button" className="secondary" disabled={!shareUrl} onClick={() => void navigator.clipboard.writeText(shareUrl)}>

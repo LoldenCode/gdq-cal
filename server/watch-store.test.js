@@ -56,3 +56,29 @@ test("admin inventory lists every group with members and selections", async () =
     await rm(dir, { recursive: true, force: true });
   }
 });
+
+test("people can optionally protect their selections with a password", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "gdq-watch-"));
+  try {
+    const store = new WatchStore(join(dir, "groups.json"));
+    const group = await store.joinGroup("protected", "Alden", "open-sesame");
+
+    assert.equal(group.people[0].passwordProtected, true);
+    assert.equal(group.people[0].passwordHash, undefined);
+    await assert.rejects(
+      () => store.setSelection("protected", "Alden", "run-1", true, ""),
+      /Password required/
+    );
+    await assert.rejects(
+      () => store.setSelection("protected", "Alden", "run-1", true, "wrong"),
+      /Password does not match/
+    );
+
+    await store.setSelection("protected", "Alden", "run-1", true, "open-sesame");
+    const updated = await store.getGroup("protected");
+    assert.deepEqual(updated.selectionsByPerson.Alden, ["run-1"]);
+    assert.equal(updated.people[0].passwordHash, undefined);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});

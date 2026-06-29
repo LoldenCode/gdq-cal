@@ -9,6 +9,7 @@ Create a long-lived group slug, share the link, let friends choose the runs they
 - Durable group links like `https://gdq.example.com/group/discord-watch-party`
 - Up to 24 planners per group
 - Each person owns their own selected watch schedule
+- Optional per-person passwords for casual protection, blank by default
 - Full GDQ schedule as selectable rows
 - Waterfall chart showing when each person plans to watch
 - Server-side JSON persistence across container redeploys
@@ -39,9 +40,10 @@ traefik.http.routers.gdq-watch-party.rule=Host(`gdq.example.com`)
 
 1. Open a shared group link or pick a readable group slug, such as `my-server-agdq`.
 2. Enter your display name and join the group.
-3. Select the runs your group plans to watch.
-4. Copy the canonical `/group/my-server-agdq` group link and share it in Discord.
-5. Friends open the same link, join with their own names, and select their schedules.
+3. Optionally enter a password if you want to protect that name from casual edits.
+4. Select the runs your group plans to watch.
+5. Copy the canonical `/group/my-server-agdq` group link and share it in Discord.
+6. Friends open the same link, join with their own names, and select their schedules.
 
 The link is long-lived as long as the mounted data volume is preserved.
 

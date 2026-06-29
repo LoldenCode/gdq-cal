@@ -147,11 +147,11 @@ const server = createServer(async (req, res) => {
       if (req.method === "GET") return json(res, 200, await watchStore.getGroup(rawSlug));
       if (req.method === "POST" && url.pathname.endsWith("/join")) {
         const body = await parseJsonBody(req);
-        return json(res, 200, await watchStore.joinGroup(rawSlug, body.name));
+        return json(res, 200, await watchStore.joinGroup(rawSlug, body.name, body.password));
       }
       if (req.method === "POST" && url.pathname.endsWith("/selections")) {
         const body = await parseJsonBody(req);
-        return json(res, 200, await watchStore.setSelection(rawSlug, body.name, body.runId, Boolean(body.selected)));
+        return json(res, 200, await watchStore.setSelection(rawSlug, body.name, body.runId, Boolean(body.selected), body.password));
       }
     }
     if (url.pathname.startsWith("/api/")) return json(res, 404, { error: "API route not found" });
@@ -163,7 +163,7 @@ const server = createServer(async (req, res) => {
     return serveStatic(req, res);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unexpected server error";
-    const status = /required|people|invalid/i.test(message) ? 400 : 500;
+    const status = /required|people|invalid|password/i.test(message) ? 400 : 500;
     return json(res, status, { error: message });
   }
 });

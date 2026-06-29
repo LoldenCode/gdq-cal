@@ -1,5 +1,6 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
+import { randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
 
 const MAX_PEOPLE = 24;
 
@@ -24,6 +25,36 @@ function cleanRunId(value) {
   const runId = String(value || "").trim();
   if (!runId) throw new Error("Run id is required");
   return runId;
+}
+
+function cleanPassword(value) {
+  return String(value || "").trim().slice(0, 128);
+}
+
+function hashPassword(password) {
+  const salt = randomBytes(16).toString("hex");
+  const hash = scryptSync(password, salt, 32).toString("hex");
+  return `${salt}:${hash}`;
+}
+
+function verifyPassword(password, storedHash) {
+  if (!storedHash) return true;
+  const [salt, hash] = String(storedHash).split(":");
+  if (!salt || !hash) return false;
+  const expected = Buffer.from(hash, "hex");
+  const actual = scryptSync(password, salt, 32);
+  return expected.length === actual.length && timingSafeEqual(expected, actual);
+}
+
+function sanitizeGroup(group) {
+  return {
+    ...group,
+    people: group.people.map((person) => ({
+      name: person.name,
+      joinedAt: person.joinedAt,
+      passwordProtected: Boolean(person.passwordHash)
+    }))
+  };
 }
 
 export class WatchStore {
@@ -87,42 +118,52 @@ export class WatchStore {
   async getGroup(slugValue) {
     const slug = cleanSlug(slugValue);
     const data = this.normalizeData(await this.readAll());
-    return data.groups[slug] || this.emptyGroup(slug);
+    return sanitizeGroup(data.groups[slug] || this.emptyGroup(slug));
   }
 
   async listGroups() {
     const data = this.normalizeData(await this.readAll());
-    return Object.values(data.groups).sort((a, b) => a.slug.localeCompare(b.slug));
+    return Object.values(data.groups).map(sanitizeGroup).sort((a, b) => a.slug.localeCompare(b.slug));
   }
 
-  async joinGroup(slugValue, nameValue) {
+  async joinGroup(slugValue, nameValue, passwordValue = "") {
     const slug = cleanSlug(slugValue);
     const name = cleanName(nameValue);
+    const password = cleanPassword(passwordValue);
     return this.update((data) => {
       this.normalizeData(data);
       const group = data.groups[slug] || this.emptyGroup(slug);
-      const exists = group.people.some((person) => person.name.toLowerCase() === name.toLowerCase());
-      if (!exists) {
+      const person = group.people.find((entry) => entry.name.toLowerCase() === name.toLowerCase());
+      if (!person) {
         if (group.people.length >= MAX_PEOPLE) throw new Error(`Group already has ${MAX_PEOPLE} people`);
-        group.people.push({ name, joinedAt: new Date().toISOString() });
+        group.people.push({ name, joinedAt: new Date().toISOString(), passwordHash: password ? hashPassword(password) : "" });
+      } else if (person.passwordHash) {
+        if (!password) throw new Error("Password required for this name");
+        if (!verifyPassword(password, person.passwordHash)) throw new Error("Password does not match this name");
+      } else if (password) {
+        person.passwordHash = hashPassword(password);
       }
       group.selectionsByPerson[name] = group.selectionsByPerson[name] || [];
       data.groups[slug] = group;
-      return group;
+      return sanitizeGroup(group);
     });
   }
 
-  async setSelection(slugValue, nameValue, runIdValue, selected) {
+  async setSelection(slugValue, nameValue, runIdValue, selected, passwordValue = "") {
     const slug = cleanSlug(slugValue);
     const name = cleanName(nameValue);
     const runId = cleanRunId(runIdValue);
+    const password = cleanPassword(passwordValue);
     return this.update((data) => {
       this.normalizeData(data);
       const group = data.groups[slug] || this.emptyGroup(slug);
-      const exists = group.people.some((person) => person.name.toLowerCase() === name.toLowerCase());
-      if (!exists) {
+      const person = group.people.find((entry) => entry.name.toLowerCase() === name.toLowerCase());
+      if (!person) {
         if (group.people.length >= MAX_PEOPLE) throw new Error(`Group already has ${MAX_PEOPLE} people`);
         group.people.push({ name, joinedAt: new Date().toISOString() });
+      } else if (person.passwordHash) {
+        if (!password) throw new Error("Password required for this name");
+        if (!verifyPassword(password, person.passwordHash)) throw new Error("Password does not match this name");
       }
 
       const current = new Set(group.selectionsByPerson[name] || []);
@@ -133,7 +174,7 @@ export class WatchStore {
       group.selectionsByPerson[name] = next;
 
       data.groups[slug] = group;
-      return group;
+      return sanitizeGroup(group);
     });
   }
 
@@ -148,7 +189,7 @@ export class WatchStore {
         if (key.toLowerCase() === name.toLowerCase()) delete group.selectionsByPerson[key];
       }
       data.groups[slug] = group;
-      return group;
+      return sanitizeGroup(group);
     });
   }
 }
