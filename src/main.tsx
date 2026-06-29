@@ -1,6 +1,7 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
 import { CalendarDays, Check, Copy, RefreshCw, Trash2, Users } from "lucide-react";
+import { buildTimelineBlocks, buildTimelineTicks } from "./timeline-layout";
 import "./styles.css";
 
 type Run = {
@@ -71,18 +72,6 @@ function formatDuration(value: string) {
   return value.replace(/^0 days?,?\s*/i, "").replace(/^0:/, "");
 }
 
-function estimateEnd(run: Run) {
-  if (run.endTime) return new Date(run.endTime).getTime();
-  if (!run.startTime) return null;
-  const parts = run.estimate.match(/(?:(\d+)\s+days?,?\s*)?(\d+):(\d+):(\d+)/i);
-  if (!parts) return new Date(run.startTime).getTime() + 45 * 60 * 1000;
-  const days = Number(parts[1] || 0);
-  const hours = Number(parts[2] || 0);
-  const minutes = Number(parts[3] || 0);
-  const seconds = Number(parts[4] || 0);
-  return new Date(run.startTime).getTime() + (((days * 24 + hours) * 60 + minutes) * 60 + seconds) * 1000;
-}
-
 function selectedNames(group: GroupPlan | null, runId: string) {
   if (!group) return [];
   return Object.entries(group.selectionsByPerson)
@@ -126,26 +115,29 @@ function ScheduleRow({
 }
 
 function Timeline({ runs, group, onRemove }: { runs: Run[]; group: GroupPlan | null; onRemove: (name: string) => void }) {
-  const runById = new Map(runs.map((run) => [run.id, run]));
   if (!group?.people.length) {
-    return <section className="timeline-empty">Join a group and select runs to build the per-person watch lists.</section>;
+    return <section className="timeline-empty">Join a group and select runs to build the shared viewing calendar.</section>;
   }
+  const layout = buildTimelineBlocks(runs, group.selectionsByPerson);
+  const ticks = buildTimelineTicks(layout.bounds, 7);
 
   return (
     <section className="timeline">
       <div className="timeline-header">
-        <h2>Viewing Lists</h2>
-        <p>Selections drop under each person for quick overlap scanning</p>
+        <h2>Viewing Calendar</h2>
+        <p>Watched runs line up by event time so gaps and overlaps are visible</p>
       </div>
-      <div className="timeline-body">
+      <div className="timeline-body" style={{ "--lane-count": group.people.length } as React.CSSProperties}>
+        <div className="time-axis" aria-hidden="true">
+          <div className="axis-spacer" />
+          <div className="axis-track">
+            {ticks.map((tick) => (
+              <span key={tick.timeMs} style={{ top: `${tick.percent}%` }}>{formatTime(new Date(tick.timeMs).toISOString())}</span>
+            ))}
+          </div>
+        </div>
         {group.people.map((person) => {
-          const selections = [...(group.selectionsByPerson[person.name] || [])].sort((a, b) => {
-            const aRun = runById.get(a);
-            const bRun = runById.get(b);
-            const aTime = aRun?.startTime ? new Date(aRun.startTime).getTime() : Number.MAX_SAFE_INTEGER;
-            const bTime = bRun?.startTime ? new Date(bRun.startTime).getTime() : Number.MAX_SAFE_INTEGER;
-            return aTime - bTime;
-          });
+          const blocks = layout.blocksByPerson[person.name] || [];
           return (
             <div className="person-column" key={person.name}>
               <div className="person-token">
@@ -154,18 +146,21 @@ function Timeline({ runs, group, onRemove }: { runs: Run[]; group: GroupPlan | n
                   <Trash2 size={15} aria-hidden="true" />
                 </button>
               </div>
-              <ol className="watch-stack">
-                {selections.length ? selections.map((runId) => {
-                  const run = runById.get(runId);
-                  if (!run) return null;
+              <div className="person-lane">
+                {ticks.map((tick) => <span className="lane-gridline" key={tick.timeMs} style={{ top: `${tick.percent}%` }} />)}
+                {blocks.length ? blocks.map((block) => {
                   return (
-                    <li key={runId} className="watch-item">
-                      <span className="watch-time">{formatShortTime(run.startTime)}</span>
-                      <span className="watch-title">{run.name}</span>
-                    </li>
+                    <article
+                      key={block.run.id}
+                      className="watch-block"
+                      style={{ top: `${block.topPercent}%`, height: `${block.heightPercent}%` }}
+                    >
+                      <span className="watch-time">{formatShortTime(block.run.startTime)}</span>
+                      <span className="watch-title">{block.run.name}</span>
+                    </article>
                   );
-                }) : <li className="watch-empty">No runs selected</li>}
-              </ol>
+                }) : <div className="watch-empty">No runs selected</div>}
+              </div>
             </div>
           );
         })}

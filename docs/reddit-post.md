@@ -11,7 +11,7 @@ Body:
 ```text
 I built a small self-hosted app for planning Games Done Quick watch parties with friends.
 
-You create a group slug, share the link in Discord, and up to 24 people can pick the runs they plan to watch. The page has two panes: the full schedule on the left and per-person watch lists on the right so you can see who is watching what and where people overlap.
+You create a group slug, share the link in Discord, and up to 24 people can pick the runs they plan to watch. The page has two panes: the full schedule on the left and time-aligned per-person calendar lanes on the right so you can see gaps and overlaps across the group.
 
 It is intentionally simple:
 - no accounts
