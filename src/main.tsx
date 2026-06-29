@@ -1,6 +1,6 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
-import { CalendarDays, Check, Clock, Copy, RefreshCw, Users } from "lucide-react";
+import { CalendarDays, Check, Copy, RefreshCw, Trash2, Users } from "lucide-react";
 import "./styles.css";
 
 type Run = {
@@ -83,14 +83,6 @@ function estimateEnd(run: Run) {
   return new Date(run.startTime).getTime() + (((days * 24 + hours) * 60 + minutes) * 60 + seconds) * 1000;
 }
 
-function getTimelineBounds(runs: Run[]) {
-  const starts = runs.map((run) => (run.startTime ? new Date(run.startTime).getTime() : null)).filter((time): time is number => time !== null);
-  const ends = runs.map(estimateEnd).filter((time): time is number => time !== null);
-  const min = Math.min(...starts);
-  const max = Math.max(...ends);
-  return Number.isFinite(min) && Number.isFinite(max) && max > min ? { min, max } : null;
-}
-
 function selectedNames(group: GroupPlan | null, runId: string) {
   if (!group) return [];
   return Object.entries(group.selectionsByPerson)
@@ -133,41 +125,47 @@ function ScheduleRow({
   );
 }
 
-function Timeline({ runs, group }: { runs: Run[]; group: GroupPlan | null }) {
-  const bounds = getTimelineBounds(runs);
+function Timeline({ runs, group, onRemove }: { runs: Run[]; group: GroupPlan | null; onRemove: (name: string) => void }) {
   const runById = new Map(runs.map((run) => [run.id, run]));
-  if (!bounds || !group?.people.length) {
-    return <section className="timeline-empty">Join a group and select runs to build the waterfall chart.</section>;
+  if (!group?.people.length) {
+    return <section className="timeline-empty">Join a group and select runs to build the per-person watch lists.</section>;
   }
-  const duration = bounds.max - bounds.min;
 
   return (
     <section className="timeline">
       <div className="timeline-header">
-        <h2>Viewing Waterfall</h2>
-        <p>{formatTime(new Date(bounds.min).toISOString())} to {formatTime(new Date(bounds.max).toISOString())}</p>
+        <h2>Viewing Lists</h2>
+        <p>Selections drop under each person for quick overlap scanning</p>
       </div>
       <div className="timeline-body">
         {group.people.map((person) => {
-          const selections = group.selectionsByPerson[person.name] || [];
+          const selections = [...(group.selectionsByPerson[person.name] || [])].sort((a, b) => {
+            const aRun = runById.get(a);
+            const bRun = runById.get(b);
+            const aTime = aRun?.startTime ? new Date(aRun.startTime).getTime() : Number.MAX_SAFE_INTEGER;
+            const bTime = bRun?.startTime ? new Date(bRun.startTime).getTime() : Number.MAX_SAFE_INTEGER;
+            return aTime - bTime;
+          });
           return (
-            <div className="timeline-lane" key={person.name}>
-              <div className="lane-name">{person.name}</div>
-              <div className="lane-track">
-                {selections.map((runId) => {
-                  const run = runById.get(runId);
-                  if (!run?.startTime) return null;
-                  const start = new Date(run.startTime).getTime();
-                  const end = estimateEnd(run) || start + 45 * 60 * 1000;
-                  const left = ((start - bounds.min) / duration) * 100;
-                  const width = Math.max(((end - start) / duration) * 100, 2);
-                  return (
-                    <div className="timeline-block" key={runId} style={{ left: `${left}%`, width: `${width}%` }} title={run.name}>
-                      {run.name}
-                    </div>
-                  );
-                })}
+            <div className="person-column" key={person.name}>
+              <div className="person-token">
+                <strong>{person.name}</strong>
+                <button type="button" className="icon-button" onClick={() => onRemove(person.name)} aria-label={`Remove ${person.name}`}>
+                  <Trash2 size={15} aria-hidden="true" />
+                </button>
               </div>
+              <ol className="watch-stack">
+                {selections.length ? selections.map((runId) => {
+                  const run = runById.get(runId);
+                  if (!run) return null;
+                  return (
+                    <li key={runId} className="watch-item">
+                      <span className="watch-time">{formatShortTime(run.startTime)}</span>
+                      <span className="watch-title">{run.name}</span>
+                    </li>
+                  );
+                }) : <li className="watch-empty">No runs selected</li>}
+              </ol>
             </div>
           );
         })}
@@ -266,6 +264,29 @@ function App() {
     }
   }
 
+  async function removePerson(name: string) {
+    setError(null);
+    try {
+      const response = await fetch(`/api/groups/${encodeURIComponent(slug)}/people`, {
+        method: "DELETE",
+        headers: { "content-type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({ name })
+      });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        throw new Error(payload?.error || `Remove failed with ${response.status}`);
+      }
+      if (name.toLowerCase() === currentName.toLowerCase()) {
+        localStorage.removeItem(`gdq-plan-name:${slug}`);
+        setCurrentName("");
+        setNameDraft("");
+      }
+      setGroup(await response.json());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not remove person");
+    }
+  }
+
   const sortedRuns = React.useMemo(() => {
     return [...(schedule?.runs || [])].sort((a, b) => {
       const aTime = a.startTime ? new Date(a.startTime).getTime() : Number.MAX_SAFE_INTEGER;
@@ -312,7 +333,7 @@ function App() {
         </form>
         <div className="group-summary">
           <strong>{slug}</strong>
-          <span><Users size={15} aria-hidden="true" /> {group?.people.length || 0}/6 planners</span>
+          <span><Users size={15} aria-hidden="true" /> {group?.people.length || 0}/24 planners</span>
           <span>{group?.people.map((person) => person.name).join(", ") || "No one joined yet"}</span>
         </div>
       </section>
@@ -333,7 +354,7 @@ function App() {
           </div>
         </section>
         <aside className="waterfall-pane">
-          <Timeline runs={sortedRuns} group={group} />
+          <Timeline runs={sortedRuns} group={group} onRemove={removePerson} />
         </aside>
       </section>
     </main>

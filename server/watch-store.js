@@ -1,7 +1,7 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 
-const MAX_PEOPLE = 6;
+const MAX_PEOPLE = 24;
 
 function cleanSlug(value) {
   const slug = String(value || "")
@@ -98,7 +98,7 @@ export class WatchStore {
       const group = data.groups[slug] || this.emptyGroup(slug);
       const exists = group.people.some((person) => person.name.toLowerCase() === name.toLowerCase());
       if (!exists) {
-        if (group.people.length >= MAX_PEOPLE) throw new Error("Group already has six people");
+        if (group.people.length >= MAX_PEOPLE) throw new Error(`Group already has ${MAX_PEOPLE} people`);
         group.people.push({ name, joinedAt: new Date().toISOString() });
       }
       group.selectionsByPerson[name] = group.selectionsByPerson[name] || [];
@@ -116,7 +116,7 @@ export class WatchStore {
       const group = data.groups[slug] || this.emptyGroup(slug);
       const exists = group.people.some((person) => person.name.toLowerCase() === name.toLowerCase());
       if (!exists) {
-        if (group.people.length >= MAX_PEOPLE) throw new Error("Group already has six people");
+        if (group.people.length >= MAX_PEOPLE) throw new Error(`Group already has ${MAX_PEOPLE} people`);
         group.people.push({ name, joinedAt: new Date().toISOString() });
       }
 
@@ -127,6 +127,21 @@ export class WatchStore {
       const next = [...current].sort((a, b) => a.localeCompare(b));
       group.selectionsByPerson[name] = next;
 
+      data.groups[slug] = group;
+      return group;
+    });
+  }
+
+  async removePerson(slugValue, nameValue) {
+    const slug = cleanSlug(slugValue);
+    const name = cleanName(nameValue);
+    return this.update((data) => {
+      this.normalizeData(data);
+      const group = data.groups[slug] || this.emptyGroup(slug);
+      group.people = group.people.filter((person) => person.name.toLowerCase() !== name.toLowerCase());
+      for (const key of Object.keys(group.selectionsByPerson)) {
+        if (key.toLowerCase() === name.toLowerCase()) delete group.selectionsByPerson[key];
+      }
       data.groups[slug] = group;
       return group;
     });

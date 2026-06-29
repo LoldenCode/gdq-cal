@@ -7,7 +7,7 @@ Create a long-lived group slug, share the link, let friends choose the runs they
 ## What It Does
 
 - Durable group links like `https://gdq.example.com/?group=discord-watch-party`
-- Up to six planners per group
+- Up to 24 planners per group
 - Each person owns their own selected watch schedule
 - Full GDQ schedule as selectable rows
 - Waterfall chart showing when each person plans to watch

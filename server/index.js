@@ -123,6 +123,10 @@ const server = createServer(async (req, res) => {
         const body = await parseJsonBody(req);
         return json(res, 200, await watchStore.setSelection(rawSlug, body.name, body.runId, Boolean(body.selected)));
       }
+      if (req.method === "DELETE" && url.pathname.endsWith("/people")) {
+        const body = await parseJsonBody(req);
+        return json(res, 200, await watchStore.removePerson(rawSlug, body.name));
+      }
     }
     if (!existsSync(publicDir)) {
       const message = await readFile(join(__dirname, "missing-build.html"), "utf8").catch(() => "Build output is missing.");
@@ -132,7 +136,7 @@ const server = createServer(async (req, res) => {
     return serveStatic(req, res);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unexpected server error";
-    const status = /required|six people|invalid/i.test(message) ? 400 : 500;
+    const status = /required|people|invalid/i.test(message) ? 400 : 500;
     return json(res, status, { error: message });
   }
 });
