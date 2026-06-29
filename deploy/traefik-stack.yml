@@ -5,16 +5,14 @@ services:
     environment:
       GDQ_EVENT_ID: "66"
       DATA_FILE: /data/watch-plans.json
-    ports:
-      - "18080:3000"
     volumes:
-      - gdq_data:/data
+      - gdq_watch_party_data:/data
     networks:
-      - porty_default
+      - proxy
     labels:
       - traefik.enable=true
-      - traefik.docker.network=porty_default
-      - traefik.http.routers.gdq-watch-party.rule=Host(`gdq.lolden.xyz`)
+      - traefik.docker.network=proxy
+      - traefik.http.routers.gdq-watch-party.rule=Host(`gdq.example.com`)
       - traefik.http.routers.gdq-watch-party.entrypoints=https
       - traefik.http.routers.gdq-watch-party.tls=true
       - traefik.http.routers.gdq-watch-party.service=gdq-watch-party
@@ -22,8 +20,8 @@ services:
       - traefik.http.services.gdq-watch-party.loadbalancer.server.scheme=http
 
 networks:
-  porty_default:
+  proxy:
     external: true
 
 volumes:
-  gdq_data:
+  gdq_watch_party_data:

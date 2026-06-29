@@ -1,0 +1,14 @@
+services:
+  gdq-watch-party:
+    image: ghcr.io/loldencode/gdq-cal:latest
+    restart: unless-stopped
+    environment:
+      GDQ_EVENT_ID: "66"
+      DATA_FILE: /data/watch-plans.json
+    ports:
+      - "3000:3000"
+    volumes:
+      - gdq_watch_party_data:/data
+
+volumes:
+  gdq_watch_party_data:
