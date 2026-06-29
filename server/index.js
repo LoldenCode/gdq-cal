@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import { createReadStream, existsSync } from "node:fs";
 import { extname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
+import { WatchStore, parseJsonBody } from "./watch-store.js";
 
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
 const publicDir = join(__dirname, "..", "dist");
@@ -10,6 +11,8 @@ const port = Number(process.env.PORT || 3000);
 const eventId = Number(process.env.GDQ_EVENT_ID || 66);
 const trackerBaseUrl = process.env.GDQ_TRACKER_BASE_URL || "https://tracker.gamesdonequick.com/tracker/api/v2";
 const cacheMs = Number(process.env.SCHEDULE_CACHE_MS || 120000);
+const dataFile = process.env.DATA_FILE || join(__dirname, "..", "data", "watch-tags.json");
+const watchStore = new WatchStore(dataFile);
 
 let cachedSchedule = null;
 let cachedAt = 0;
@@ -109,6 +112,18 @@ const server = createServer(async (req, res) => {
     const url = new URL(req.url || "/", "http://localhost");
     if (url.pathname === "/api/health") return json(res, 200, { ok: true });
     if (url.pathname === "/api/schedule") return json(res, 200, await fetchSchedule());
+    if (url.pathname.startsWith("/api/rooms/")) {
+      const [, , , rawSlug] = url.pathname.split("/");
+      if (req.method === "GET") return json(res, 200, await watchStore.getRoom(rawSlug));
+      if (req.method === "POST" && url.pathname.endsWith("/join")) {
+        const body = await parseJsonBody(req);
+        return json(res, 200, await watchStore.joinRoom(rawSlug, body.name));
+      }
+      if (req.method === "POST" && url.pathname.endsWith("/picks")) {
+        const body = await parseJsonBody(req);
+        return json(res, 200, await watchStore.setPick(rawSlug, body.name, body.runId, Boolean(body.watching)));
+      }
+    }
     if (!existsSync(publicDir)) {
       const message = await readFile(join(__dirname, "missing-build.html"), "utf8").catch(() => "Build output is missing.");
       res.writeHead(503, { "content-type": "text/html; charset=utf-8" });
@@ -116,7 +131,9 @@ const server = createServer(async (req, res) => {
     }
     return serveStatic(req, res);
   } catch (error) {
-    return json(res, 500, { error: error instanceof Error ? error.message : "Unexpected server error" });
+    const message = error instanceof Error ? error.message : "Unexpected server error";
+    const status = /required|six people|invalid/i.test(message) ? 400 : 500;
+    return json(res, status, { error: message });
   }
 });
 

@@ -18,6 +18,7 @@ Open `http://localhost:3000`.
 - `GDQ_EVENT_ID`: GDQ Tracker event id, default `66`
 - `GDQ_TRACKER_BASE_URL`: GDQ Tracker API base URL, default `https://tracker.gamesdonequick.com/tracker/api/v2`
 - `SCHEDULE_CACHE_MS`: Schedule cache duration, default `120000`
+- `DATA_FILE`: JSON file for shared room watch picks, default `data/watch-tags.json`
 
 ## Portainer
 

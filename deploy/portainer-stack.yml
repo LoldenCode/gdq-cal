@@ -4,8 +4,11 @@ services:
     restart: unless-stopped
     environment:
       GDQ_EVENT_ID: "66"
+      DATA_FILE: /data/watch-tags.json
     ports:
       - "18080:3000"
+    volumes:
+      - gdq_data:/data
     networks:
       - porty_default
     labels:
@@ -21,3 +24,6 @@ services:
 networks:
   porty_default:
     external: true
+
+volumes:
+  gdq_data:
