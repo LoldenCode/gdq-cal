@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { buildTimelineBlocks } from "./timeline-layout";
+import { buildDaySeparators, buildTimelineBlocks } from "./timeline-layout";
 
 const baseRuns = [
   {
@@ -37,5 +37,21 @@ describe("buildTimelineBlocks", () => {
     expect(layout.blocksByPerson.Alden[1].topPercent).toBeGreaterThan(layout.blocksByPerson.Alden[0].topPercent + 30);
     expect(layout.blocksByPerson.Alden[1].heightPercent).toBeGreaterThan(layout.blocksByPerson.Alden[0].heightPercent);
     expect(layout.blocksByPerson.Jamie[1].topPercent).toBeGreaterThan(layout.blocksByPerson.Alden[1].topPercent);
+  });
+});
+
+describe("buildDaySeparators", () => {
+  test("places day breaks at local midnight for the viewer timezone", () => {
+    const localStart = new Date(2026, 0, 1, 10, 0, 0).getTime();
+    const localEnd = new Date(2026, 0, 3, 10, 0, 0).getTime();
+
+    const separators = buildDaySeparators({ startMs: localStart, endMs: localEnd });
+
+    expect(separators.map((separator) => separator.label)).toEqual([
+      new Intl.DateTimeFormat(undefined, { weekday: "short", month: "short", day: "numeric" }).format(new Date(2026, 0, 2)),
+      new Intl.DateTimeFormat(undefined, { weekday: "short", month: "short", day: "numeric" }).format(new Date(2026, 0, 3))
+    ]);
+    expect(separators[0].percent).toBeCloseTo(29.17, 1);
+    expect(separators[1].percent).toBeCloseTo(79.17, 1);
   });
 });

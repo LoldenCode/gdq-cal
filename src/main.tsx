@@ -1,7 +1,7 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
 import { CalendarDays, Check, Copy, RefreshCw, Trash2, Users } from "lucide-react";
-import { buildTimelineBlocks, buildTimelineTicks } from "./timeline-layout";
+import { buildDaySeparators, buildTimelineBlocks, buildTimelineTicks } from "./timeline-layout";
 import "./styles.css";
 
 type Run = {
@@ -120,6 +120,7 @@ function Timeline({ runs, group, onRemove }: { runs: Run[]; group: GroupPlan | n
   }
   const layout = buildTimelineBlocks(runs, group.selectionsByPerson);
   const ticks = buildTimelineTicks(layout.bounds, 7);
+  const daySeparators = buildDaySeparators(layout.bounds);
 
   return (
     <section className="timeline">
@@ -131,8 +132,11 @@ function Timeline({ runs, group, onRemove }: { runs: Run[]; group: GroupPlan | n
         <div className="time-axis" aria-hidden="true">
           <div className="axis-spacer" />
           <div className="axis-track">
+            {daySeparators.map((separator) => (
+              <span className="axis-day-label" key={separator.timeMs} style={{ top: `${separator.percent}%` }}>{separator.label}</span>
+            ))}
             {ticks.map((tick) => (
-              <span key={tick.timeMs} style={{ top: `${tick.percent}%` }}>{formatTime(new Date(tick.timeMs).toISOString())}</span>
+              <span className="axis-time-label" key={tick.timeMs} style={{ top: `${tick.percent}%` }}>{formatTime(new Date(tick.timeMs).toISOString())}</span>
             ))}
           </div>
         </div>
@@ -148,6 +152,14 @@ function Timeline({ runs, group, onRemove }: { runs: Run[]; group: GroupPlan | n
               </div>
               <div className="person-lane">
                 {ticks.map((tick) => <span className="lane-gridline" key={tick.timeMs} style={{ top: `${tick.percent}%` }} />)}
+                {daySeparators.map((separator) => (
+                  <span
+                    className="lane-dayline"
+                    key={separator.timeMs}
+                    style={{ top: `${separator.percent}%` }}
+                    aria-hidden="true"
+                  />
+                ))}
                 {blocks.length ? blocks.map((block) => {
                   return (
                     <article

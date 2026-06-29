@@ -19,6 +19,12 @@ export type TimelineBounds = {
   endMs: number;
 };
 
+export type DaySeparator = {
+  timeMs: number;
+  percent: number;
+  label: string;
+};
+
 function estimateEnd(run: TimelineRun) {
   if (run.endTime) return new Date(run.endTime).getTime();
   if (!run.startTime) return null;
@@ -89,4 +95,29 @@ export function buildTimelineTicks(bounds: TimelineBounds | null, count = 6) {
       percent
     };
   });
+}
+
+export function buildDaySeparators(bounds: TimelineBounds | null): DaySeparator[] {
+  if (!bounds) return [];
+  const duration = Math.max(bounds.endMs - bounds.startMs, 1);
+  const firstDay = new Date(bounds.startMs);
+  let nextMidnight = new Date(firstDay.getFullYear(), firstDay.getMonth(), firstDay.getDate() + 1).getTime();
+  const formatter = new Intl.DateTimeFormat(undefined, {
+    weekday: "short",
+    month: "short",
+    day: "numeric"
+  });
+  const separators: DaySeparator[] = [];
+
+  while (nextMidnight < bounds.endMs) {
+    separators.push({
+      timeMs: nextMidnight,
+      percent: ((nextMidnight - bounds.startMs) / duration) * 100,
+      label: formatter.format(new Date(nextMidnight))
+    });
+    const current = new Date(nextMidnight);
+    nextMidnight = new Date(current.getFullYear(), current.getMonth(), current.getDate() + 1).getTime();
+  }
+
+  return separators;
 }

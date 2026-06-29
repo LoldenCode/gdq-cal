@@ -305,11 +305,21 @@ h2 {
   font-weight: 800;
 }
 
-.axis-track span {
+.axis-time-label,
+.axis-day-label {
   position: absolute;
   right: 0;
   transform: translateY(-50%);
   white-space: nowrap;
+}
+
+.axis-day-label {
+  z-index: 1;
+  padding: 2px 5px;
+  border-radius: 4px;
+  background: #17201c;
+  color: #fffaf0;
+  font-size: 0.7rem;
 }
 
 .person-token {
@@ -357,6 +367,14 @@ h2 {
   border-top: 1px solid rgba(23, 32, 28, 0.09);
 }
 
+.lane-dayline {
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 1;
+  border-top: 2px solid rgba(23, 32, 28, 0.6);
+}
+
 .watch-block,
 .watch-empty {
   display: block;
@@ -367,6 +385,7 @@ h2 {
 
 .watch-block {
   position: absolute;
+  z-index: 2;
   left: 9px;
   right: 0;
   overflow: hidden;
