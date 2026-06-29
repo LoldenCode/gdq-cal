@@ -34,6 +34,8 @@ type AdminGroupsResponse = {
   groups: GroupPlan[];
 };
 
+const CALENDAR_TOP_GUTTER_PX = 14;
+
 function getInitialSlug() {
   const params = new URLSearchParams(window.location.search);
   const querySlug = params.get("group") || params.get("room");
@@ -141,9 +143,9 @@ function ScheduleCalendar({
 }) {
   return (
     <div className="schedule-list" ref={scrollRef} onScroll={onScroll}>
-      <div className="schedule-calendar" style={{ height: `${heightPx}px` }}>
+      <div className="schedule-calendar" style={{ height: `${heightPx + CALENDAR_TOP_GUTTER_PX}px` }}>
         {daySeparators.map((separator) => (
-          <span className="schedule-dayline" key={separator.timeMs} style={{ top: `${separator.topPx ?? 0}px` }}>
+          <span className="schedule-dayline" key={separator.timeMs} style={{ top: `${(separator.topPx ?? 0) + CALENDAR_TOP_GUTTER_PX}px` }}>
             {separator.label}
           </span>
         ))}
@@ -154,7 +156,7 @@ function ScheduleCalendar({
             group={group}
             currentName={currentName}
             onToggle={onToggle}
-            style={{ top: `${block.topPx ?? 0}px`, height: `${block.heightPx ?? 80}px` }}
+            style={{ top: `${(block.topPx ?? 0) + CALENDAR_TOP_GUTTER_PX}px`, height: `${block.heightPx ?? 80}px` }}
           />
         ))}
       </div>
@@ -195,12 +197,12 @@ function Timeline({
           style={{ "--lane-count": group.people.length } as React.CSSProperties}
         >
           <div className="time-axis" aria-hidden="true">
-            <div className="axis-track" style={{ height: `${layout.heightPx}px` }}>
+            <div className="axis-track" style={{ height: `${layout.heightPx + CALENDAR_TOP_GUTTER_PX}px` }}>
               {daySeparators.map((separator) => (
-                <span className="axis-day-label" key={separator.timeMs} style={{ top: `${separator.topPx ?? 0}px` }}>{separator.label}</span>
+                <span className="axis-day-label" key={separator.timeMs} style={{ top: `${(separator.topPx ?? 0) + CALENDAR_TOP_GUTTER_PX}px` }}>{separator.label}</span>
               ))}
               {ticks.map((tick) => (
-                <span className="axis-time-label" key={tick.timeMs} style={{ top: `${tick.topPx ?? 0}px` }}>{formatTime(new Date(tick.timeMs).toISOString())}</span>
+                <span className="axis-time-label" key={tick.timeMs} style={{ top: `${(tick.topPx ?? 0) + CALENDAR_TOP_GUTTER_PX}px` }}>{formatTime(new Date(tick.timeMs).toISOString())}</span>
               ))}
             </div>
           </div>
@@ -208,22 +210,22 @@ function Timeline({
             const blocks = layout.blocksByPerson[person.name] || [];
             return (
               <div className="person-column" key={person.name}>
-                <div className="person-lane" style={{ height: `${layout.heightPx}px` }}>
-                  {ticks.map((tick) => <span className="lane-gridline" key={tick.timeMs} style={{ top: `${tick.topPx ?? 0}px` }} />)}
+                <div className="person-lane" style={{ height: `${layout.heightPx + CALENDAR_TOP_GUTTER_PX}px` }}>
+                  {ticks.map((tick) => <span className="lane-gridline" key={tick.timeMs} style={{ top: `${(tick.topPx ?? 0) + CALENDAR_TOP_GUTTER_PX}px` }} />)}
                   {daySeparators.map((separator) => (
                     <span
                       className="lane-dayline"
                       key={separator.timeMs}
-                      style={{ top: `${separator.topPx ?? 0}px` }}
+                      style={{ top: `${(separator.topPx ?? 0) + CALENDAR_TOP_GUTTER_PX}px` }}
                       aria-hidden="true"
                     />
                   ))}
                   {blocks.length ? blocks.map((block) => {
                     return (
                       <article
-                        key={block.run.id}
+                      key={block.run.id}
                       className="watch-block"
-                      style={{ top: `${block.topPx ?? 0}px`, height: `${block.heightPx ?? 44}px` }}
+                      style={{ top: `${(block.topPx ?? 0) + CALENDAR_TOP_GUTTER_PX}px`, height: `${block.heightPx ?? 44}px` }}
                     >
                       <span className="watch-meta">
                         <span className="watch-time">{formatShortTime(block.run.startTime)}</span>
