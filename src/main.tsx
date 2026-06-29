@@ -36,6 +36,7 @@ type AdminGroupsResponse = {
 
 const CALENDAR_TOP_GUTTER_PX = 14;
 const LAST_GROUP_KEY = "gdq-plan-last-slug";
+const JOINED_GROUPS_KEY = "gdq-plan-joined-slugs";
 
 function getInitialSlug() {
   const params = new URLSearchParams(window.location.search);
@@ -57,6 +58,22 @@ function cleanSlug(value: string) {
 function getStoredName(slug: string) {
   if (!slug) return "";
   return localStorage.getItem(`gdq-plan-name:${slug}`) || "";
+}
+
+function getJoinedSlugs() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(JOINED_GROUPS_KEY) || "[]");
+    const storedSlugs = Array.isArray(parsed) ? parsed.map(cleanSlug).filter(Boolean) : [];
+    const lastSlug = cleanSlug(localStorage.getItem(LAST_GROUP_KEY) || "");
+    return [...new Set([lastSlug, ...storedSlugs].filter(Boolean))];
+  } catch {
+    return cleanSlug(localStorage.getItem(LAST_GROUP_KEY) || "") ? [cleanSlug(localStorage.getItem(LAST_GROUP_KEY) || "")] : [];
+  }
+}
+
+function rememberJoinedSlug(slug: string) {
+  const next = [slug, ...getJoinedSlugs().filter((storedSlug) => storedSlug !== slug)].slice(0, 12);
+  localStorage.setItem(JOINED_GROUPS_KEY, JSON.stringify(next));
 }
 
 function formatTime(value: string | null) {
@@ -120,7 +137,7 @@ function ScheduleRow({
         <p>{run.category || "Any%"} · {formatDuration(run.estimate)}{run.console ? ` · ${run.console}` : ""}</p>
         <p className="runners">{run.runners.length ? run.runners.join(", ") : "Runner TBD"}</p>
       </div>
-      <div className="people-cell">{names.length ? names.join(", ") : joined ? "No one yet" : "Join to plan"}</div>
+      <div className="people-cell">{names.length ? names.join(", ") : joined ? "No one yet" : "Join group"}</div>
     </article>
   );
 }
@@ -366,6 +383,7 @@ function App() {
   const [slugDraft, setSlugDraft] = React.useState(getInitialSlug);
   const [nameDraft, setNameDraft] = React.useState(() => getStoredName(getInitialSlug()));
   const [currentName, setCurrentName] = React.useState(() => getStoredName(getInitialSlug()));
+  const [joinedSlugs, setJoinedSlugs] = React.useState(getJoinedSlugs);
   const [group, setGroup] = React.useState<GroupPlan | null>(null);
   const [schedule, setSchedule] = React.useState<ScheduleResponse | null>(null);
   const [error, setError] = React.useState<string | null>(null);
@@ -427,6 +445,8 @@ function App() {
       }
       localStorage.setItem(`gdq-plan-name:${nextSlug}`, name);
       localStorage.setItem(LAST_GROUP_KEY, nextSlug);
+      rememberJoinedSlug(nextSlug);
+      setJoinedSlugs(getJoinedSlugs());
       setCurrentName(name);
       setSlug(nextSlug);
       setSlugDraft(nextSlug);
@@ -435,6 +455,15 @@ function App() {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not join group");
     }
+  }
+
+  function switchGroup(nextSlug: string) {
+    const cleanNextSlug = cleanSlug(nextSlug);
+    if (!cleanNextSlug || cleanNextSlug === slug) return;
+    localStorage.setItem(LAST_GROUP_KEY, cleanNextSlug);
+    setSlug(cleanNextSlug);
+    setSlugDraft(cleanNextSlug);
+    window.history.replaceState(null, "", `/group/${encodeURIComponent(cleanNextSlug)}`);
   }
 
   async function toggleSelection(runId: string, selected: boolean) {
@@ -503,7 +532,7 @@ function App() {
         <div>
           <p className="eyebrow">GDQ watch party planner</p>
           <h1>{schedule?.eventName ?? "Games Done Quick"}</h1>
-          <p className="lede">Pick your personal watch schedule, share the group link, and compare everyone&apos;s plan in a timeline before the event starts.</p>
+          <p className="lede">Pick your personal watch schedule, share the group link, and compare everyone&apos;s selections in a timeline before the event starts.</p>
         </div>
         <div className="hero-actions">
           <button type="button" onClick={() => void load()} disabled={loading}>
@@ -527,7 +556,7 @@ function App() {
             Your name
             <input value={nameDraft} onChange={(event) => setNameDraft(event.target.value)} placeholder="Alden" />
           </label>
-          <button type="submit">Join plan</button>
+          <button type="submit">{slug && slug === cleanSlug(slugDraft) ? "Join group" : "Switch / join"}</button>
           <button type="button" className="secondary" disabled={!shareUrl} onClick={() => void navigator.clipboard.writeText(shareUrl)}>
             <Copy size={16} aria-hidden="true" />
             Copy group link
@@ -537,18 +566,36 @@ function App() {
           <strong>{slug || "No group selected"}</strong>
           {slug ? <span className="share-url">{shareUrl}</span> : <span>Open a shared `/group/name` link or enter a group slug to join.</span>}
           <span><Users size={15} aria-hidden="true" /> {group?.people.length || 0}/24 planners</span>
-          <span>{group?.people.map((person) => person.name).join(", ") || (slug ? "No one joined yet" : "Join a group to start planning")}</span>
+          <span>{group?.people.map((person) => person.name).join(", ") || (slug ? "No one joined yet" : "Join or switch to a group")}</span>
         </div>
       </section>
 
-      {error ? <section className="notice">Could not update the plan: {error}</section> : null}
+      {joinedSlugs.length ? (
+        <section className="joined-groups" aria-label="Joined groups">
+          <strong>Your groups</strong>
+          <div>
+            {joinedSlugs.map((joinedSlug) => (
+              <button
+                type="button"
+                className={joinedSlug === slug ? "group-chip active" : "group-chip"}
+                key={joinedSlug}
+                onClick={() => switchGroup(joinedSlug)}
+              >
+                {joinedSlug}
+              </button>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {error ? <section className="notice">Could not update the group: {error}</section> : null}
       {loading && !schedule ? <section className="notice">Loading the run list...</section> : null}
 
       <section className="planner-layout">
         <section className="schedule-pane">
           <div className="pane-heading">
             <h2>Schedule</h2>
-            <p>{currentName ? `Selecting as ${currentName}` : "Join the group to select your runs"}</p>
+            <p>{currentName ? `Selecting as ${currentName}` : "Join this group to select your runs"}</p>
           </div>
           <ScheduleCalendar
             blocks={calendarLayout.runBlocks}

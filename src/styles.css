@@ -169,6 +169,33 @@ input {
   white-space: nowrap;
 }
 
+.joined-groups {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid rgba(23, 32, 28, 0.12);
+}
+
+.joined-groups > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.group-chip {
+  min-height: 32px;
+  padding: 0 11px;
+  border: 1px solid rgba(23, 32, 28, 0.18);
+  background: #fffaf0;
+  color: #17201c;
+}
+
+.group-chip.active {
+  background: #17201c;
+  color: #fffaf0;
+}
+
 .notice {
   margin: 18px 0;
   padding: 14px 16px;
