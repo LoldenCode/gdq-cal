@@ -1,0 +1,23 @@
+services:
+  gdq:
+    image: ghcr.io/loldencode/gdq-cal:latest
+    restart: unless-stopped
+    environment:
+      GDQ_EVENT_ID: "66"
+    ports:
+      - "18080:3000"
+    networks:
+      - porty_default
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=porty_default
+      - traefik.http.routers.gdq.rule=Host(`gdq.lolden.xyz`)
+      - traefik.http.routers.gdq.entrypoints=https
+      - traefik.http.routers.gdq.tls=true
+      - traefik.http.routers.gdq.service=gdq
+      - traefik.http.services.gdq.loadbalancer.server.port=3000
+      - traefik.http.services.gdq.loadbalancer.server.scheme=http
+
+networks:
+  porty_default:
+    external: true
