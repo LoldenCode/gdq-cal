@@ -12,6 +12,8 @@ export type TimelineBlock = {
   endMs: number;
   topPercent: number;
   heightPercent: number;
+  topPx?: number;
+  heightPx?: number;
 };
 
 export type TimelineBounds = {
@@ -23,6 +25,18 @@ export type DaySeparator = {
   timeMs: number;
   percent: number;
   label: string;
+  topPx?: number;
+};
+
+export type TimelineTick = {
+  timeMs: number;
+  percent: number;
+  topPx?: number;
+};
+
+export type TimelinePixelOptions = {
+  pixelsPerHour?: number;
+  minBlockHeightPx?: number;
 };
 
 function estimateEnd(run: TimelineRun) {
@@ -85,7 +99,59 @@ export function buildTimelineBlocks(runs: TimelineRun[], selectionsByPerson: Rec
   return { bounds, blocksByPerson };
 }
 
-export function buildTimelineTicks(bounds: TimelineBounds | null, count = 6) {
+function makeBlock(run: TimelineRun, bounds: TimelineBounds, pixelsPerMs: number, minBlockHeightPx: number): TimelineBlock | null {
+  if (!run.startTime) return null;
+  const startMs = new Date(run.startTime).getTime();
+  const endMs = estimateEnd(run);
+  if (!Number.isFinite(startMs) || !endMs || !Number.isFinite(endMs)) return null;
+  const safeEndMs = Math.max(endMs, startMs + 15 * 60 * 1000);
+  const duration = Math.max(bounds.endMs - bounds.startMs, 1);
+  return {
+    run,
+    startMs,
+    endMs: safeEndMs,
+    topPercent: ((startMs - bounds.startMs) / duration) * 100,
+    heightPercent: Math.max(((safeEndMs - startMs) / duration) * 100, 1.4),
+    topPx: (startMs - bounds.startMs) * pixelsPerMs,
+    heightPx: Math.max((safeEndMs - startMs) * pixelsPerMs, minBlockHeightPx)
+  };
+}
+
+export function buildTimelinePixels(
+  runs: TimelineRun[],
+  selectionsByPerson: Record<string, string[]>,
+  options: TimelinePixelOptions = {}
+) {
+  const bounds = getTimelineBounds(runs);
+  const pixelsPerHour = options.pixelsPerHour ?? 58;
+  const minBlockHeightPx = options.minBlockHeightPx ?? 44;
+  const pixelsPerMs = pixelsPerHour / (60 * 60 * 1000);
+  const runById = new Map(runs.map((run) => [run.id, run]));
+  const heightPx = bounds ? Math.max((bounds.endMs - bounds.startMs) * pixelsPerMs, 520) : 520;
+  const runBlocks = bounds
+    ? runs
+        .map((run) => makeBlock(run, bounds, pixelsPerMs, minBlockHeightPx))
+        .filter((block): block is TimelineBlock => Boolean(block))
+        .sort((a, b) => a.startMs - b.startMs)
+    : [];
+  const blocksByPerson: Record<string, TimelineBlock[]> = {};
+
+  for (const [name, selections] of Object.entries(selectionsByPerson)) {
+    blocksByPerson[name] = bounds
+      ? selections
+          .map((runId) => {
+            const run = runById.get(runId);
+            return run ? makeBlock(run, bounds, pixelsPerMs, minBlockHeightPx) : null;
+          })
+          .filter((block): block is TimelineBlock => Boolean(block))
+          .sort((a, b) => a.startMs - b.startMs)
+      : [];
+  }
+
+  return { bounds, heightPx, runBlocks, blocksByPerson };
+}
+
+export function buildTimelineTicks(bounds: TimelineBounds | null, count = 6): TimelineTick[] {
   if (!bounds) return [];
   const duration = Math.max(bounds.endMs - bounds.startMs, 1);
   return Array.from({ length: count }, (_, index) => {

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { buildDaySeparators, buildTimelineBlocks } from "./timeline-layout";
+import { buildDaySeparators, buildTimelineBlocks, buildTimelinePixels } from "./timeline-layout";
 
 const baseRuns = [
   {
@@ -53,5 +53,24 @@ describe("buildDaySeparators", () => {
     ]);
     expect(separators[0].percent).toBeCloseTo(29.17, 1);
     expect(separators[1].percent).toBeCloseTo(79.17, 1);
+  });
+});
+
+describe("buildTimelinePixels", () => {
+  test("uses one pixel scale for schedule rows and viewer blocks", () => {
+    const layout = buildTimelinePixels(baseRuns, {
+      Alden: ["opening", "late"],
+      Jamie: ["opening"]
+    }, { pixelsPerHour: 50 });
+
+    const scheduleOpening = layout.runBlocks.find((block) => block.run.id === "opening");
+    const aldenOpening = layout.blocksByPerson.Alden.find((block) => block.run.id === "opening");
+    const scheduleLate = layout.runBlocks.find((block) => block.run.id === "late");
+
+    expect(scheduleOpening?.topPx).toBe(aldenOpening?.topPx);
+    expect(scheduleLate?.topPx).toBe(300);
+    expect(layout.heightPx).toBe(650);
+    expect(scheduleOpening?.heightPx).toBe(50);
+    expect(scheduleLate?.heightPx).toBe(100);
   });
 });

@@ -257,23 +257,45 @@ h2 {
 }
 
 .schedule-list {
-  display: grid;
-  gap: 8px;
   max-height: calc(100vh - 250px);
   overflow: auto;
   padding-right: 4px;
+  position: relative;
+}
+
+.schedule-calendar {
+  position: relative;
+  min-height: 520px;
+}
+
+.schedule-dayline {
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 1;
+  padding-top: 5px;
+  border-top: 2px solid rgba(23, 32, 28, 0.42);
+  color: #52615b;
+  font-size: 0.76rem;
+  font-weight: 800;
+  text-align: right;
 }
 
 .schedule-row {
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 2;
   display: grid;
   grid-template-columns: 42px 82px minmax(0, 1fr) minmax(130px, 0.45fr);
   gap: 12px;
   align-items: center;
-  min-height: 94px;
+  min-height: 0;
   border: 1px solid rgba(23, 32, 28, 0.14);
   background: #fffaf0;
   border-radius: 8px;
-  padding: 12px;
+  padding: 8px 12px;
+  overflow: hidden;
 }
 
 .schedule-row.selected {
@@ -353,7 +375,8 @@ h2 {
   grid-template-columns: 74px repeat(var(--lane-count), minmax(168px, 1fr));
   gap: 12px;
   align-items: stretch;
-  overflow-x: auto;
+  max-height: calc(100vh - 250px);
+  overflow: auto;
   padding-bottom: 4px;
 }
 
@@ -361,13 +384,13 @@ h2 {
   display: grid;
   gap: 8px;
   min-width: 168px;
-  grid-template-rows: 38px minmax(520px, 64vh);
+  grid-template-rows: 38px auto;
 }
 
 .time-axis {
   display: grid;
   gap: 8px;
-  grid-template-rows: 38px minmax(520px, 64vh);
+  grid-template-rows: 38px auto;
   min-width: 74px;
 }
 
@@ -432,7 +455,6 @@ h2 {
 .person-lane {
   position: relative;
   min-height: 520px;
-  height: 64vh;
   border-left: 2px solid rgba(15, 111, 99, 0.24);
   background: linear-gradient(90deg, rgba(23, 32, 28, 0.035) 0 1px, transparent 1px);
 }

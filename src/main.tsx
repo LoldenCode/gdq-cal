@@ -1,7 +1,7 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
 import { CalendarDays, Check, Copy, RefreshCw, Trash2, Users } from "lucide-react";
-import { buildDaySeparators, buildTimelineBlocks, buildTimelineTicks } from "./timeline-layout";
+import { buildDaySeparators, buildTimelinePixels, buildTimelineTicks, type TimelineBlock } from "./timeline-layout";
 import "./styles.css";
 
 type Run = {
@@ -87,12 +87,14 @@ function ScheduleRow({
   run,
   group,
   currentName,
-  onToggle
+  onToggle,
+  style
 }: {
   run: Run;
   group: GroupPlan | null;
   currentName: string;
   onToggle: (runId: string, selected: boolean) => void;
+  style?: React.CSSProperties;
 }) {
   const joined = Boolean(currentName && group?.people.some((person) => person.name.toLowerCase() === currentName.toLowerCase()));
   const currentSelections = currentName ? group?.selectionsByPerson[currentName] || [] : [];
@@ -100,7 +102,7 @@ function ScheduleRow({
   const names = selectedNames(group, run.id);
 
   return (
-    <article className={selected ? "schedule-row selected" : "schedule-row"}>
+    <article className={selected ? "schedule-row selected" : "schedule-row"} style={style}>
       <button className={selected ? "select-run active" : "select-run"} type="button" disabled={!joined} onClick={() => onToggle(run.id, !selected)} aria-label={`Select ${run.name}`}>
         <Check size={16} aria-hidden="true" />
       </button>
@@ -118,13 +120,66 @@ function ScheduleRow({
   );
 }
 
-function Timeline({ runs, group }: { runs: Run[]; group: GroupPlan | null }) {
+function ScheduleCalendar({
+  blocks,
+  group,
+  currentName,
+  onToggle,
+  daySeparators,
+  heightPx,
+  scrollRef,
+  onScroll
+}: {
+  blocks: TimelineBlock[];
+  group: GroupPlan | null;
+  currentName: string;
+  onToggle: (runId: string, selected: boolean) => void;
+  daySeparators: ReturnType<typeof buildDaySeparators>;
+  heightPx: number;
+  scrollRef: React.RefObject<HTMLDivElement | null>;
+  onScroll: React.UIEventHandler<HTMLDivElement>;
+}) {
+  return (
+    <div className="schedule-list" ref={scrollRef} onScroll={onScroll}>
+      <div className="schedule-calendar" style={{ height: `${heightPx}px` }}>
+        {daySeparators.map((separator) => (
+          <span className="schedule-dayline" key={separator.timeMs} style={{ top: `${separator.topPx ?? 0}px` }}>
+            {separator.label}
+          </span>
+        ))}
+        {blocks.map((block) => (
+          <ScheduleRow
+            key={block.run.id}
+            run={block.run as Run}
+            group={group}
+            currentName={currentName}
+            onToggle={onToggle}
+            style={{ top: `${block.topPx ?? 0}px`, height: `${block.heightPx ?? 80}px` }}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function Timeline({
+  group,
+  layout,
+  ticks,
+  daySeparators,
+  scrollRef,
+  onScroll
+}: {
+  group: GroupPlan | null;
+  layout: ReturnType<typeof buildTimelinePixels>;
+  ticks: ReturnType<typeof buildTimelineTicks>;
+  daySeparators: ReturnType<typeof buildDaySeparators>;
+  scrollRef: React.RefObject<HTMLDivElement | null>;
+  onScroll: React.UIEventHandler<HTMLDivElement>;
+}) {
   if (!group?.people.length) {
     return <section className="timeline-empty">Join a group and select runs to build the shared viewing calendar.</section>;
   }
-  const layout = buildTimelineBlocks(runs, group.selectionsByPerson);
-  const ticks = buildTimelineTicks(layout.bounds, 7);
-  const daySeparators = buildDaySeparators(layout.bounds);
 
   return (
     <section className="timeline">
@@ -132,15 +187,20 @@ function Timeline({ runs, group }: { runs: Run[]; group: GroupPlan | null }) {
         <h2>Viewing Calendar</h2>
         <p>Watched runs line up by event time so gaps and overlaps are visible</p>
       </div>
-      <div className="timeline-body" style={{ "--lane-count": group.people.length } as React.CSSProperties}>
+      <div
+        className="timeline-body"
+        ref={scrollRef}
+        onScroll={onScroll}
+        style={{ "--lane-count": group.people.length } as React.CSSProperties}
+      >
         <div className="time-axis" aria-hidden="true">
           <div className="axis-spacer" />
-          <div className="axis-track">
+          <div className="axis-track" style={{ height: `${layout.heightPx}px` }}>
             {daySeparators.map((separator) => (
-              <span className="axis-day-label" key={separator.timeMs} style={{ top: `${separator.percent}%` }}>{separator.label}</span>
+              <span className="axis-day-label" key={separator.timeMs} style={{ top: `${separator.topPx ?? 0}px` }}>{separator.label}</span>
             ))}
             {ticks.map((tick) => (
-              <span className="axis-time-label" key={tick.timeMs} style={{ top: `${tick.percent}%` }}>{formatTime(new Date(tick.timeMs).toISOString())}</span>
+              <span className="axis-time-label" key={tick.timeMs} style={{ top: `${tick.topPx ?? 0}px` }}>{formatTime(new Date(tick.timeMs).toISOString())}</span>
             ))}
           </div>
         </div>
@@ -151,13 +211,13 @@ function Timeline({ runs, group }: { runs: Run[]; group: GroupPlan | null }) {
               <div className="person-token">
                 <strong>{person.name}</strong>
               </div>
-              <div className="person-lane">
-                {ticks.map((tick) => <span className="lane-gridline" key={tick.timeMs} style={{ top: `${tick.percent}%` }} />)}
+              <div className="person-lane" style={{ height: `${layout.heightPx}px` }}>
+                {ticks.map((tick) => <span className="lane-gridline" key={tick.timeMs} style={{ top: `${tick.topPx ?? 0}px` }} />)}
                 {daySeparators.map((separator) => (
                   <span
                     className="lane-dayline"
                     key={separator.timeMs}
-                    style={{ top: `${separator.percent}%` }}
+                    style={{ top: `${separator.topPx ?? 0}px` }}
                     aria-hidden="true"
                   />
                 ))}
@@ -166,7 +226,7 @@ function Timeline({ runs, group }: { runs: Run[]; group: GroupPlan | null }) {
                     <article
                       key={block.run.id}
                       className="watch-block"
-                      style={{ top: `${block.topPercent}%`, height: `${block.heightPercent}%` }}
+                      style={{ top: `${block.topPx ?? 0}px`, height: `${block.heightPx ?? 44}px` }}
                     >
                       <span className="watch-time">{formatShortTime(block.run.startTime)}</span>
                       <span className="watch-title">{block.run.name}</span>
@@ -304,6 +364,9 @@ function App() {
   const [schedule, setSchedule] = React.useState<ScheduleResponse | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(true);
+  const scheduleScrollRef = React.useRef<HTMLDivElement | null>(null);
+  const timelineScrollRef = React.useRef<HTMLDivElement | null>(null);
+  const syncingScrollRef = React.useRef(false);
   const shareUrl = `${window.location.origin}/?group=${encodeURIComponent(slug)}`;
 
   const loadGroup = React.useCallback(async (groupSlug: string) => {
@@ -393,6 +456,39 @@ function App() {
     });
   }, [schedule]);
 
+  const calendarLayout = React.useMemo(() => {
+    return buildTimelinePixels(sortedRuns, group?.selectionsByPerson || {}, {
+      pixelsPerHour: 150,
+      minBlockHeightPx: 52
+    });
+  }, [group?.selectionsByPerson, sortedRuns]);
+  const timelineTicks = React.useMemo(() => {
+    const ticks = buildTimelineTicks(calendarLayout.bounds, 12);
+    if (!calendarLayout.bounds) return ticks;
+    const duration = Math.max(calendarLayout.bounds.endMs - calendarLayout.bounds.startMs, 1);
+    return ticks.map((tick) => ({
+      ...tick,
+      topPx: ((tick.timeMs - calendarLayout.bounds!.startMs) / duration) * calendarLayout.heightPx
+    }));
+  }, [calendarLayout]);
+  const daySeparators = React.useMemo(() => {
+    if (!calendarLayout.bounds) return [];
+    const duration = Math.max(calendarLayout.bounds.endMs - calendarLayout.bounds.startMs, 1);
+    return buildDaySeparators(calendarLayout.bounds).map((separator) => ({
+      ...separator,
+      topPx: ((separator.timeMs - calendarLayout.bounds!.startMs) / duration) * calendarLayout.heightPx
+    }));
+  }, [calendarLayout]);
+
+  function syncScroll(source: HTMLDivElement, target: HTMLDivElement | null) {
+    if (!target || syncingScrollRef.current) return;
+    syncingScrollRef.current = true;
+    target.scrollTop = source.scrollTop;
+    window.requestAnimationFrame(() => {
+      syncingScrollRef.current = false;
+    });
+  }
+
   return (
     <main>
       <header className="hero">
@@ -445,14 +541,26 @@ function App() {
             <h2>Schedule</h2>
             <p>{currentName ? `Selecting as ${currentName}` : "Join the group to select your runs"}</p>
           </div>
-          <div className="schedule-list">
-            {sortedRuns.map((run) => (
-              <ScheduleRow key={run.id} run={run} group={group} currentName={currentName} onToggle={toggleSelection} />
-            ))}
-          </div>
+          <ScheduleCalendar
+            blocks={calendarLayout.runBlocks}
+            group={group}
+            currentName={currentName}
+            onToggle={toggleSelection}
+            daySeparators={daySeparators}
+            heightPx={calendarLayout.heightPx}
+            scrollRef={scheduleScrollRef}
+            onScroll={(event) => syncScroll(event.currentTarget, timelineScrollRef.current)}
+          />
         </section>
         <aside className="waterfall-pane">
-          <Timeline runs={sortedRuns} group={group} />
+          <Timeline
+            group={group}
+            layout={calendarLayout}
+            ticks={timelineTicks}
+            daySeparators={daySeparators}
+            scrollRef={timelineScrollRef}
+            onScroll={(event) => syncScroll(event.currentTarget, scheduleScrollRef.current)}
+          />
         </aside>
       </section>
     </main>
